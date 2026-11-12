@@ -32,11 +32,15 @@ Ofertas SHALL conter apenas o necessário para a fisioterapeuta decidir: nome e 
 - **THEN** o aviso informa que nome, idade e endereço da criança são enviados às fisioterapeutas da equipe para oferta do atendimento
 
 ### Requirement: Retenção e exclusão
-O sistema SHALL apagar o histórico de conversa após prazo definido (padrão 90 dias) e SHALL atender pedidos do responsável de acesso, correção e exclusão dos dados, respeitando obrigações legais de guarda.
+O sistema SHALL manter permanentemente o histórico de atendimentos (agendamentos, fisio, datas e endereços), por decisão da clínica, e SHALL atender pedidos do responsável de acesso, correção e exclusão. Num pedido de exclusão, o que a clínica precisa guardar por obrigação legal SHALL ser mantido com acesso restrito, e o restante SHALL ser apagado ou anonimizado.
 
 #### Scenario: Pedido de exclusão
 - **WHEN** o responsável escreve "quero que apaguem meus dados"
-- **THEN** o pedido é registrado, a equipe é avisada e o responsável recebe confirmação com prazo de atendimento
+- **THEN** o pedido é registrado, a secretária é avisada e o responsável recebe confirmação com prazo de atendimento
+
+#### Scenario: Consulta ao histórico antigo
+- **WHEN** a secretária consulta, anos depois, os atendimentos de uma criança
+- **THEN** o histórico completo de agendamentos continua disponível e o acesso fica registrado
 
 ### Requirement: Segurança e registro de acesso
 Os dados SHALL ser criptografados em trânsito e em repouso, armazenados no Brasil, e todo acesso humano a dados de pacientes SHALL ser registrado.

@@ -12,11 +12,13 @@
 ## 2. Canal WhatsApp
 
 - [ ] 2.1 Iniciar a verificação da empresa no Meta Business Manager e reservar o número novo (sem uso em nenhum app de WhatsApp); verificar status "Verificado" no Business Manager antes do grupo 8
-- [ ] 2.2 Implementar adaptador de canal (interface + implementação Twilio) com validação de assinatura e verificar por teste que webhook com assinatura inválida é rejeitado
-- [ ] 2.3 Implementar deduplicação por id da mensagem e fila de processamento; verificar por teste que webhook duplicado gera uma única resposta
-- [ ] 2.4 Implementar roteador de papel por telefone (família, fisio, equipe, papel ambíguo) e verificar pelos cenários da spec `canal-whatsapp`
-- [ ] 2.5 Registrar o número novo e o nome de exibição no provedor, redigir e submeter os templates de utilidade de D5; verificar aprovação no painel do provedor
-- [ ] 2.6 Documentar em `docs/whatsapp.md` como configurar número, sandbox e templates
+- [ ] 2.2 Confirmar com o provedor (Twilio, Meta Cloud API ou outro BSP) o suporte à coexistência app WhatsApp Business + API no número novo e decidir o provedor; verificar com um número de teste em coexistência recebendo eco das mensagens enviadas pelo app
+- [ ] 2.3 Implementar adaptador de canal (interface + implementação Twilio) com validação de assinatura e verificar por teste que webhook com assinatura inválida é rejeitado
+- [ ] 2.4 Implementar deduplicação por id da mensagem e fila de processamento; verificar por teste que webhook duplicado gera uma única resposta
+- [ ] 2.5 Implementar roteador de papel por telefone (família, fisio, equipe, papel ambíguo) e verificar pelos cenários da spec `canal-whatsapp`
+- [ ] 2.6 Implementar pausa automática do agente pelo eco das mensagens da secretária e devolução da conversa (comando ou 4 h sem mensagens); verificar pelo cenário "Secretária assume a conversa"
+- [ ] 2.7 Registrar o número novo e o nome de exibição no provedor, redigir e submeter os templates de utilidade de D5; verificar aprovação no painel do provedor
+- [ ] 2.8 Documentar em `docs/whatsapp.md` como configurar número, sandbox e templates
 
 ## 3. Integração com as agendas (Outlook e Google)
 
@@ -58,14 +60,15 @@
 - [ ] 6.1 Escrever prompt de sistema da "secretária" e ferramentas da família (D6); verificar que o servidor bloqueia opções não retornadas por `buscar_opcoes`
 - [ ] 6.2 Implementar detecção determinística de gravidade antes do LLM; verificar com lista de frases de teste
 - [ ] 6.3 Implementar fluxo completo: consentimento, coleta, opções, solicitação, confirmação com .ics, cancelamento, remarcação e lembrete de véspera; verificar pelos cenários da spec `atendimento-responsaveis`
-- [ ] 6.4 Implementar transferência para humano e pausa do bot; verificar que o agente não responde enquanto a conversa está com a equipe
-- [ ] 6.5 Criar suíte de ~50 conversas roteirizadas e rodá-la no CI; verificar taxa de sucesso mínima definida
+- [ ] 6.4 Implementar checagem de área atendida (municípios) e respostas sobre valores a partir da tabela configurável; verificar pelos cenários dos requisitos "Área de atendimento" e "Valores e pagamento"
+- [ ] 6.5 Implementar transferência para humano e pausa do bot; verificar que o agente não responde enquanto a conversa está com a equipe
+- [ ] 6.6 Criar suíte de ~50 conversas roteirizadas e rodá-la no CI; verificar taxa de sucesso mínima definida
 
 ## 7. Privacidade (LGPD)
 
 - [ ] 7.1 Implementar registro de consentimento com versão do aviso e verificar que sem consentimento nenhum dado da criança é gravado
 - [ ] 7.2 Implementar minimização nas ofertas e no evento da agenda (Outlook ou Google); verificar por teste que a oferta contém nome, idade e endereço mas não telefone do responsável nem dados clínicos
-- [ ] 7.3 Implementar retenção (expurgo de conversas em 90 dias) e fluxo de pedido de exclusão/acesso; verificar por teste do job de expurgo
+- [ ] 7.3 Implementar retenção (histórico de atendimentos permanente, expurgo de conversas brutas em 90 dias) e fluxo de pedido de exclusão/acesso com anonimização; verificar por teste do job de expurgo e de anonimização
 - [ ] 7.4 Implementar log de acesso humano a dados de pacientes e verificar registro por teste
 - [ ] 7.5 Redigir aviso de privacidade e lista de operadores/transferências internacionais em `docs/privacidade.md` para revisão jurídica
 

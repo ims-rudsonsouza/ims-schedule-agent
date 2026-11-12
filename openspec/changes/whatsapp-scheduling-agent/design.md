@@ -17,10 +17,10 @@ Restrições: um desenvolvedor, ~2 meses até o piloto, 10 fisios hoje, dados de
 **Goals:**
 - O motor de alocação é **determinístico e testável**; o LLM conversa e chama ferramentas, mas não escolhe fisio nem inventa horário.
 - Separação rígida entre os dois papéis no mesmo número (família x fisio): prompts, ferramentas e dados diferentes.
-- Outlook continua sendo a agenda que as fisios usam no dia a dia; o sistema se adapta a edições manuais.
+- A agenda pessoal (Outlook ou Google) continua sendo o que as fisios usam no dia a dia; o sistema se adapta a edições manuais.
 
 **Non-Goals (MVP):**
-- Prontuário, evolução clínica, faturamento, convênios e pagamentos.
+- Prontuário, evolução clínica, faturamento, convênios e cobrança. O agente só informa valores e formas de pagamento quando a família pergunta; geração de link de pagamento e confirmação de pagamento ficam com a secretária.
 - Otimização de rotas completa (VRP/OR-Tools); usamos heurística gulosa por inserção.
 - Painel administrativo completo (apenas telas mínimas de cadastro e auditoria, ou planilha/Retool).
 - Pacotes ou séries de sessões reservados pelo agente. Pelo WhatsApp chega o primeiro contato, uma sessão por vez. As seguintes são combinadas pessoalmente entre família e fisio, e a fisio as registra pela conversa ou direto na agenda (D3).
@@ -188,6 +188,14 @@ Fila da oferta aberta: [aceites do horário original no topo] + [propostas por o
 - **Roteamento:** papel decidido pelo telefone (cadastro de fisios e equipe). Fisio que fala como mãe de paciente escolhe o papel explicitamente; a sessão guarda o papel ativo por 2 h.
 - **Janela de 24 h:** ofertas, lembretes e avisos iniciados pelo sistema usam **templates de utilidade** aprovados com botões de resposta rápida: `oferta_atendimento`, `oferta_preenchida`, `oferta_expirada`, `confirmacao_agendamento`, `lembrete_vespera`, `aviso_cancelamento`, `resumo_agenda_dia`.
 - **Política da Meta para IA:** a Meta restringiu chatbots de IA de propósito geral na API do WhatsApp Business; um assistente restrito ao agendamento da clínica é uso de negócio permitido, mas o prompt deve recusar conversas fora do escopo. Confirmar a política vigente ao registrar o número.
+- **Secretária no mesmo número (definido pelo Rudson):** a secretária atende pelo celular, no mesmo número do agente. Isso depende da **coexistência** da Meta, que permite usar o mesmo número no app WhatsApp Business do celular e na API ao mesmo tempo, com as mensagens espelhadas nos dois lados. Implicações:
+  - O provedor precisa suportar coexistência. Isso tem que ser confirmado antes de fechar entre Twilio e Meta Cloud API direta (ou um BSP que suporte), e pode mudar a recomendação de provedor.
+  - A coexistência tem limites próprios (por exemplo, recursos do app que não funcionam com a API e regras de ativação do número). Eles precisam ser checados na documentação vigente da Meta no momento do registro.
+  - Toda mensagem enviada pela secretária pelo app chega ao sistema como eco. O agente usa esse eco para pausar a conversa automaticamente (`HUMANO_ATIVO`) e volta quando ela devolver a conversa (comando, por exemplo uma etiqueta ou "#bot") ou depois de 4 horas sem mensagens dela.
+  - As transferências do agente (gravidade, área fora, desconto, pedido explícito) chegam ao celular dela como uma conversa normal, com uma nota interna de contexto enviada ao número de alerta dela.
+  - **Plano B**, se a coexistência não for viável no provedor escolhido: uma caixa de entrada web responsiva (ex.: Chatwoot integrado à API), que a secretária abre no navegador do celular.
+- **Área atendida (definida pelo Rudson):** municípios de São Paulo, Osasco e Barueri, incluindo Alphaville. A checagem usa o município devolvido pela geocodificação. Alphaville também se estende por Santana de Parnaíba (ver perguntas em aberto). Fora da área, o agente passa para a secretária.
+- **Valores:** tabela configurável (tipo de serviço → valor), usada só quando a família pergunta. Atendimento apenas particular; formas de pagamento: Pix, transferência ou link de pagamento. Desconto, parcelamento e envio de link ficam com a secretária.
 - **Humanização:** respostas curtas, indicador de "digitando", leve atraso proporcional ao tamanho do texto, emojis com moderação, nome da clínica, nunca fingir ser humano.
 
 ### D6. LLM e salvaguardas
@@ -217,7 +225,7 @@ Fila da oferta aberta: [aceites do horário original no topo] + [propostas por o
 - **Base legal:** dados de saúde (art. 11) e de crianças (art. 14) → consentimento específico e destacado de pai/mãe ou responsável legal, além da tutela da saúde quando aplicável; registrar prova do consentimento.
 - **Minimização:** sem diagnóstico no WhatsApp nem no Outlook; evento com primeiro nome/iniciais, endereço, telefone do responsável e código. Ofertas levam nome, idade e endereço da criança (necessários para a fisio decidir), mas não telefone do responsável nem dados clínicos. Como a oferta aberta envia esses dados a várias fisios, o aviso de privacidade deve dizer isso e as fisios devem assinar termo de confidencialidade; mensagens já entregues no celular delas não podem ser apagadas pelo sistema.
 - **Operadores e transferência internacional (art. 33):** Twilio/Meta, Microsoft, Google e Anthropic processam dados fora do Brasil em parte; listar todos no aviso de privacidade e firmar DPAs. Banco e backups em sa-east-1.
-- **Retenção:** histórico de conversa 90 dias; agendamentos pelo prazo que a clínica definir (ver perguntas); exclusão sob pedido.
+- **Retenção (definida pelo Rudson):** o histórico de atendimentos é mantido permanentemente. A finalidade (continuidade do cuidado e registro da clínica) precisa constar no aviso de privacidade. Num pedido de exclusão, guarda-se só o que for obrigação legal, com acesso restrito, e o resto é apagado ou anonimizado. O histórico bruto das conversas no WhatsApp segue com prazo de 90 dias (ver perguntas em aberto).
 - **Segurança:** TLS, criptografia em repouso (RDS/KMS), segredos no Secrets Manager, log de acesso humano, princípio do menor privilégio no Graph (D4): o sistema lê só horários das agendas pessoais e escreve só na agenda dedicada, no Outlook e no Google; tokens das fisios criptografados e revogáveis. O Google passa a ser operador (Google Calendar API) e deve constar no aviso de privacidade.
 - Revisão por profissional de LGPD antes do piloto com dados reais.
 
@@ -262,8 +270,8 @@ As respostas abaixo ajustam parâmetros e detalhes; onde não houver resposta, v
 10. ~~**Prazo da negociação**~~ **Respondido:** 2 horas ou 3 rodadas sem acordo.
 11. ~~**Prazo de resposta das fisios**~~ **Respondido:** 20 min em horário comercial e 10 h de madrugada, limitado pela antecedência do atendimento. Pendente: confirmar a faixa do horário comercial (suposição: 8h–18h, todos os dias).
 12. ~~**Duração**~~ **Respondido:** o atendimento conta 1 h no registro, e a agenda reserva mais 10 min de relatório, além do deslocamento.
-13. **Nome da fisio nas opções:** mostrar o nome da fisio nas opções à família (suposição) ou só após o aceite?
-14. **Equipe humana:** quem recebe as transferências e em que horário? Existe um número atual da secretária que será migrado?
-15. **Área atendida:** quais cidades/bairros? Fora dela o agente recusa ou passa para humano?
-16. **Valores, convênio e pagamento** ficam fora do agente no MVP (suposição)?
-17. **Retenção de agendamentos:** por quanto tempo a clínica precisa guardar o histórico de atendimentos?
+13. ~~**Nome da fisio nas opções**~~ **Respondido:** sim, as opções mostram o nome da fisio quando a família não pediu uma específica.
+14. ~~**Equipe humana**~~ **Respondido:** a secretária, direto no celular, no mesmo número do agente (coexistência, D5). Pendente: confirmar que o provedor escolhido suporta coexistência; se não suportar, usar o plano B (caixa de entrada web).
+15. ~~**Área atendida**~~ **Respondido:** São Paulo, Osasco e Barueri (Alphaville). Pendente: a parte de Alphaville que fica em Santana de Parnaíba também é atendida? (suposição: sim)
+16. ~~**Valores e pagamento**~~ **Respondido:** só se a família perguntar; apenas particular; Pix, transferência ou link de pagamento. Pendente: a tabela de valores por tipo de atendimento.
+17. ~~**Retenção**~~ **Respondido:** manter sempre o histórico de atendimentos. Pendente: o histórico bruto das conversas no WhatsApp também deve ser mantido para sempre, ou pode ser apagado após 90 dias? (suposição: 90 dias, por minimização)
