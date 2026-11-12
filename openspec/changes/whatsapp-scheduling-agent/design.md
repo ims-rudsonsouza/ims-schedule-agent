@@ -108,14 +108,16 @@ A `origem_atual` é o atendimento em andamento ou anterior no dia, ou a residên
 
 ```
 custo_desloc = desloc(P->novo) + desloc(novo->S) - desloc(P->S)     (minutos de deslocamento adicionados)
-ocupacao     = horas_ocupadas_dentro_dos_blocos_Disponível / horas_disponíveis   (período: semana atual + próxima)
-               (inclui sessões combinadas pessoalmente e eventos que a fisio criou direto na agenda)
+ocupacao     = (nº de atendimentos no período × 1 h) / horas_disponíveis      (período: semana atual + próxima)
+  atendimentos      = os do sistema + sessões combinadas pessoalmente + eventos que a fisio criou na agenda dedicada,
+                      cada um contando 1 h (deslocamento e relatório não entram)
+  horas_disponíveis = soma dos blocos `Disponível` menos os compromissos pessoais que caem dentro deles
 score        = w_d * (custo_desloc / 60) + w_c * ocupacao
 padrões: w_d = 1,0 ; w_c = 1,0  ->  10 pontos percentuais de ocupação "valem" ~6 min de deslocamento
 ```
 
 - Usar **inserção** (custo adicional) e não apenas a distância da residência premia encaixar visitas vizinhas no mesmo roteiro.
-- Ocupação relativa à disponibilidade atende "parecido conforme a disponibilidade": uma fisio com 10 h livres e 5 atendimentos está tão ocupada quanto uma com 4 h e 2.
+- Ocupação = pacientes por hora disponível (definido pelo Rudson): quem tem agenda mais extensa pode ter mais pacientes sem ser penalizada. Exemplo: com 20 h disponíveis e 8 atendimentos (40%), uma fisio está menos ocupada que outra com 10 h e 6 atendimentos (60%), e por isso recebe a próxima oferta, mesmo já tendo mais pacientes.
 - Trava de justiça opcional: se a ocupação de uma fisio ultrapassar a média do grupo em mais de 25 pp, ela só é ofertada se não houver outra no raio.
 
 **Passo 5 — Fora do raio (oferta aberta).** Se o grupo no raio estiver vazio para o horário escolhido, criar uma **oferta aberta** para todas as fisios com o horário livre (Passo 1), qualquer distância. Primeira a aceitar fica com o atendimento.
@@ -252,12 +254,12 @@ As respostas abaixo ajustam parâmetros e detalhes; onde não houver resposta, v
 4. ~~**Urgência**~~ **Respondido:** há atendimento no mesmo dia, em fins de semana e feriados; antecedência mínima de 1 hora (D2).
 5. ~~**Aceite da fisio**~~ **Respondido:** a fisio sempre precisa aceitar; não há aceite automático.
 6. ~~**Número de WhatsApp**~~ **Respondido:** número novo, que precisa ser verificado na Meta Business (D5).
-7. **Raio de 10 km:** contar a partir da residência e também do atendimento anterior do dia (suposição) ou só da residência? Distância de rota (suposição) ou em linha reta?
-8. **Equilíbrio:** medir por horas agendadas sobre disponíveis em 2 semanas (suposição) ou por número de pacientes ativos?
+7. ~~**Raio de 10 km**~~ **Respondido:** distância por rota. Ainda vale a suposição de origem: residência ou atendimento anterior do dia.
+8. ~~**Equilíbrio**~~ **Respondido:** número de atendimentos (1 h cada) sobre horas disponíveis (D2).
 9. **Oferta aberta e negociação:** suposição de que, se uma fisio propõe outro horário numa oferta aberta, as ofertas às demais ficam suspensas até o fim da negociação. Confirmar.
 10. **Prazo da negociação:** 2 horas ou 3 rodadas sem acordo é razoável?
 11. **Prazo de resposta das fisios:** 20 min é aceitável? E de madrugada, ofertas ficam para a manhã?
-12. **Duração:** a sessão é sempre de 60 min + 10 min de relatório?
+12. **Duração:** para registro o atendimento dura 1 h (respondido). Pendente: a margem de 10 min para relatório entre visitas continua valendo na hora de montar a agenda? (suposição: sim)
 13. **Nome da fisio nas opções:** mostrar o nome da fisio nas opções à família (suposição) ou só após o aceite?
 14. **Equipe humana:** quem recebe as transferências e em que horário? Existe um número atual da secretária que será migrado?
 15. **Área atendida:** quais cidades/bairros? Fora dela o agente recusa ou passa para humano?
