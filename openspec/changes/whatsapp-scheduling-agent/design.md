@@ -142,9 +142,11 @@ Oferta aberta em suspensão: ENVIADA -> SUSPENSA (outra fisio negociando) -> ENV
 - **Botão Recusar x resposta por texto:** o botão é a recusa explícita; o orquestrador da fisio trata o toque de forma determinística e o pedido vai para `AGUARDANDO_FAMILIA`, com a mensagem "A Bia não tem disponibilidade nesse horário. Posso verificar com outra fisioterapeuta, ou prefere outro horário com a Bia?". Isso vale para qualquer fisio, pedida pela família ou escolhida pelo ranking. Texto livre nunca é tratado como recusa: se indicar outro dia/horário, abre negociação; se for só uma negativa ("não posso"), o agente pergunta se ela quer recusar ou sugerir outro horário. O estouro do prazo é tratado como recusa.
 - Perguntas da fisio sobre a oferta ("tem elevador?", "a criança tem quantos meses?") são respondidas com `detalhes_da_oferta`; o que não estiver no cadastro pode ser perguntado à família pelo agente, sem encerrar a oferta. O prazo da oferta é estendido em 10 min enquanto houver conversa ativa.
 
-### D4. Integração com Outlook (Microsoft Graph)
+### D4. Integração com as agendas das fisios (Outlook e Google Agenda)
 
-**Modelo (definido pelo Rudson):** cada fisio tem **sua própria conta Outlook, com e-mail pessoal** (Outlook.com/Hotmail, conta Microsoft pessoal). O sistema acessa a agenda de cada uma em nome dela.
+**Modelo (definido pelo Rudson):** cada fisio tem **sua própria conta, com e-mail pessoal**, que pode ser Outlook.com/Hotmail (conta Microsoft) **ou Gmail** (Google Agenda). O sistema acessa a agenda de cada uma em nome dela, por um adaptador com duas implementações. As regras abaixo valem para as duas; os detalhes de cada provedor vêm no fim desta seção.
+
+**Outlook (Microsoft Graph):**
 
 - **Autenticação:** app registrado no Entra ID aceitando **contas Microsoft pessoais** (audiência `consumers` ou `common`), com **permissões delegadas** `Calendars.ReadWrite` e `offline_access`. Permissão de aplicativo (app-only) não funciona para contas pessoais. Cada fisio conecta a conta uma vez por um link enviado pelo WhatsApp (fluxo OAuth com código de autorização + PKCE) e consente. O refresh token fica criptografado (KMS) e é renovado a cada uso.
 - **Desconexão:** se o token for revogado, a senha mudar ou a conta ficar muito tempo sem uso, a renovação falha. A fisio deixa de receber ofertas, e ela e a equipe recebem um aviso com novo link de conexão.
@@ -152,7 +154,17 @@ Oferta aberta em suspensão: ENVIADA -> SUSPENSA (outra fisio negociando) -> ENV
 - **Disponibilidade:** blocos com a categoria `Disponível` (podem ser recorrentes) na agenda dedicada. Ocupado = qualquer evento na agenda dedicada ou na agenda principal da fisio que não esteja marcado como livre. Leitura via `GET /me/calendars/{id}/calendarView?startDateTime=…&endDateTime=…&$select=start,end,showAs,categories,isCancelled` (expande recorrências). Dos eventos pessoais o sistema lê **só início, fim e status**, nunca título, local ou participantes.
 - **Escrita:** `POST /me/calendars/{dedicada}/events` com `transactionId` (idempotência) e uma *single-value extended property* com o id do agendamento. O sistema só escreve na agenda dedicada.
 - **Sincronização:** assinatura de notificações de alteração por fisio (agenda dedicada e principal), renovada antes de expirar (≈3 dias), e `delta` de `calendarView` a cada 5 min como rede de segurança. Edição/exclusão manual de um evento do sistema → pedido `A_VERIFICAR` + pergunta à fisio pelo WhatsApp.
-- **Adaptador de agenda:** a integração fica atrás de uma interface (`ler_ocupacao`, `criar_evento`, `atualizar_evento`, `cancelar_evento`, `assinar_mudancas`), para permitir Google Calendar se alguma fisio usar Gmail (ver perguntas em aberto).
+- **Adaptador de agenda:** a integração fica atrás de uma interface (`conectar`, `ler_ocupacao`, `criar_evento`, `atualizar_evento`, `cancelar_evento`, `assinar_mudancas`, `sincronizar`). O motor de agendamento só conhece a interface, e o provedor de cada fisio fica no cadastro (`provedor_agenda`).
+
+**Google Agenda (Google Calendar API):**
+- **Autenticação:** projeto no Google Cloud com tela de consentimento OAuth externa e permissões delegadas com escopos mínimos: `calendar.app.created` (criar e gerenciar só as agendas criadas pelo app) e `calendar.freebusy` (ler apenas os horários ocupados das outras agendas). Mesmo fluxo de conexão por link no WhatsApp (OAuth + PKCE, `access_type=offline`), com refresh token criptografado.
+- **Verificação do app:** com a tela de consentimento em modo "Teste", o Google expira os refresh tokens em 7 dias, o que derrubaria a conexão das fisios toda semana. Antes do piloto, o app precisa ser publicado e passar pela verificação do Google para escopos sensíveis (política de privacidade publicada, domínio verificado e vídeo do fluxo). Contar algumas semanas para isso no cronograma.
+- **Agenda dedicada:** `calendars.insert` cria "Atendimentos IMS". Blocos `Disponível` e atendimentos ficam nela, e a fisio os vê no app Google Agenda.
+- **Disponibilidade:** eventos da agenda dedicada via `events.list` (`singleEvents=true` para expandir recorrências). A ocupação das agendas pessoais vem de `freeBusy.query`, que já devolve **só intervalos ocupados**, sem título nem local, o que atende o requisito de privacidade por construção.
+- **Escrita:** `events.insert` na agenda dedicada com `extendedProperties.private` contendo o id do agendamento, e um id de evento gerado pelo sistema para garantir idempotência.
+- **Sincronização:** `events.watch` (notificações push por webhook) na agenda dedicada, com o canal renovado antes de expirar, mais `syncToken` incremental a cada 5 min como rede de segurança. As agendas pessoais não emitem notificações com esses escopos, então a ocupação é consultada por `freeBusy` na hora de montar opções e de novo antes de confirmar.
+
+**Diferenças que o motor precisa saber:** no Outlook, uma mudança na agenda principal chega por notificação. No Google, o motor só descobre na próxima consulta de `freeBusy`. A reverificação antes de confirmar (spec `agenda-fisioterapeutas`) cobre os dois casos.
 - **Cache:** janela de agenda em Redis por fisio (TTL curto, invalidado pelas notificações); sempre reconsultar antes de confirmar.
 
 ### D5. WhatsApp e número único
@@ -191,7 +203,7 @@ Oferta aberta em suspensão: ENVIADA -> SUSPENSA (outra fisio negociando) -> ENV
 - **Minimização:** sem diagnóstico no WhatsApp nem no Outlook; evento com primeiro nome/iniciais, endereço, telefone do responsável e código. Ofertas levam nome, idade e endereço da criança (necessários para a fisio decidir), mas não telefone do responsável nem dados clínicos. Como a oferta aberta envia esses dados a várias fisios, o aviso de privacidade deve dizer isso e as fisios devem assinar termo de confidencialidade; mensagens já entregues no celular delas não podem ser apagadas pelo sistema.
 - **Operadores e transferência internacional (art. 33):** Twilio/Meta, Microsoft, Google e Anthropic processam dados fora do Brasil em parte; listar todos no aviso de privacidade e firmar DPAs. Banco e backups em sa-east-1.
 - **Retenção:** histórico de conversa 90 dias; agendamentos pelo prazo que a clínica definir (ver perguntas); exclusão sob pedido.
-- **Segurança:** TLS, criptografia em repouso (RDS/KMS), segredos no Secrets Manager, log de acesso humano, princípio do menor privilégio no Graph (D4): o sistema lê só horários das agendas pessoais e escreve só na agenda dedicada; tokens das fisios criptografados e revogáveis.
+- **Segurança:** TLS, criptografia em repouso (RDS/KMS), segredos no Secrets Manager, log de acesso humano, princípio do menor privilégio no Graph (D4): o sistema lê só horários das agendas pessoais e escreve só na agenda dedicada, no Outlook e no Google; tokens das fisios criptografados e revogáveis. O Google passa a ser operador (Google Calendar API) e deve constar no aviso de privacidade.
 - Revisão por profissional de LGPD antes do piloto com dados reais.
 
 ### D9. Infraestrutura
@@ -201,6 +213,7 @@ Mantida a do design anterior: AWS sa-east-1, FastAPI em App Runner/Fargate, RDS 
 ## Risks / Trade-offs
 
 - [Fisios não respondem rápido às ofertas] → prazos curtos, aceite automático opcional, ondas paralelas configuráveis e alerta para a equipe humana.
+- [Verificação do app no Google atrasa o piloto ou tokens expiram em 7 dias no modo Teste] → iniciar a verificação na fase de fundação; no piloto interno, usar contas Outlook ou aceitar a reconexão semanal.
 - [Fisio revoga o acesso ou o token expira] → status de conexão monitorado, fisio sai das ofertas até reconectar, aviso com link para ela e para a equipe.
 - [Agenda no Outlook fica desatualizada ou é usada de forma inconsistente] → convenção simples (categoria `Disponível`), resumo diário pelo WhatsApp para a fisio conferir, sincronização por notificação + delta.
 - [Família espera demais pela confirmação] → mensagem honesta de "estou confirmando", prazo máximo por pedido (ex.: 60 min) antes de oferecer alternativas ou humano.
@@ -222,7 +235,7 @@ Projeto novo, sem migração de dados. Implantação em etapas: (1) sandbox do W
 
 As respostas abaixo ajustam parâmetros e detalhes; onde não houver resposta, vale a suposição indicada.
 
-1. ~~**Agenda:** uma conta da clínica ou uma por fisio?~~ **Respondido:** cada fisio tem conta própria, com e-mail pessoal. Pendente: todas usam Outlook.com/Hotmail, ou alguma usa Gmail? (suposição: todas Outlook.com/Hotmail; Gmail exigiria o adaptador de Google Calendar)
+1. ~~**Agenda:** uma conta da clínica ou uma por fisio?~~ **Respondido:** cada fisio tem conta própria, com e-mail pessoal. Também pode haver fisio com Gmail, então o sistema suporta Outlook e Google Agenda (D4).
 2. **Como as fisios informam disponibilidade hoje?** Suposição: blocos `Disponível` no Outlook. Alternativa: grade semanal no sistema.
 3. **Aceite da fisio:** toda marcação precisa de aceite (suposição) ou algumas fisios aceitam automaticamente?
 4. **Raio de 10 km:** contar a partir da residência e também do atendimento anterior do dia (suposição) ou só da residência? Distância de rota (suposição) ou em linha reta?

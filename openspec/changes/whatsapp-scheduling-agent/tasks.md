@@ -17,14 +17,17 @@
 - [ ] 2.4 Redigir e submeter os templates de utilidade de D5; verificar aprovação no painel do provedor
 - [ ] 2.5 Documentar em `docs/whatsapp.md` como configurar número, sandbox e templates
 
-## 3. Integração Outlook
+## 3. Integração com as agendas (Outlook e Google)
 
 - [ ] 3.1 Registrar app no Entra ID para contas Microsoft pessoais com permissões delegadas `Calendars.ReadWrite` + `offline_access` e implementar o fluxo de conexão (link pelo WhatsApp, OAuth + PKCE, token criptografado, criação da agenda dedicada); verificar conectando uma conta Outlook.com de teste
 - [ ] 3.2 Implementar monitoramento da conexão (renovação de token, falha → fisio sai das ofertas + aviso com link); verificar por teste com token revogado
 - [ ] 3.3 Implementar leitura de disponibilidade (blocos `Disponível` da agenda dedicada menos eventos ocupados da dedicada e da principal, lendo só início/fim/status) e verificar com testes usando respostas gravadas do Graph
 - [ ] 3.4 Implementar criação/atualização/cancelamento de eventos com `transactionId` e propriedade estendida; verificar idempotência por teste
 - [ ] 3.5 Implementar assinaturas de notificação, renovação automática e delta de segurança; verificar que exclusão manual marca o agendamento como `A_VERIFICAR`
-- [ ] 3.6 Documentar em `docs/outlook.md` a convenção de disponibilidade para as fisios
+- [ ] 3.6 Definir a interface do adaptador de agenda e rodar os testes de 3.3–3.5 contra ela, com a implementação Outlook; verificar que o motor não importa nada específico de provedor
+- [ ] 3.7 Criar projeto Google Cloud com escopos `calendar.app.created` + `calendar.freebusy`, implementar a conexão Google (OAuth + PKCE, agenda dedicada) e iniciar a verificação do app; verificar conectando uma conta Gmail de teste
+- [ ] 3.8 Implementar o adaptador Google (leitura via `events.list` + `freeBusy`, escrita idempotente, `events.watch` + `syncToken`); verificar passando os mesmos testes do adaptador Outlook
+- [ ] 3.9 Documentar em `docs/agenda.md` como a fisio conecta a conta (Outlook ou Google) e a convenção de disponibilidade; verificar seguindo o passo a passo com uma conta de cada provedor
 
 ## 4. Motor de alocação
 
@@ -56,7 +59,7 @@
 ## 7. Privacidade (LGPD)
 
 - [ ] 7.1 Implementar registro de consentimento com versão do aviso e verificar que sem consentimento nenhum dado da criança é gravado
-- [ ] 7.2 Implementar minimização nas ofertas e no evento do Outlook; verificar por teste que a oferta contém nome, idade e endereço mas não telefone do responsável nem dados clínicos
+- [ ] 7.2 Implementar minimização nas ofertas e no evento da agenda (Outlook ou Google); verificar por teste que a oferta contém nome, idade e endereço mas não telefone do responsável nem dados clínicos
 - [ ] 7.3 Implementar retenção (expurgo de conversas em 90 dias) e fluxo de pedido de exclusão/acesso; verificar por teste do job de expurgo
 - [ ] 7.4 Implementar log de acesso humano a dados de pacientes e verificar registro por teste
 - [ ] 7.5 Redigir aviso de privacidade e lista de operadores/transferências internacionais em `docs/privacidade.md` para revisão jurídica
@@ -64,5 +67,5 @@
 ## 8. Piloto
 
 - [ ] 8.1 Implantar em AWS sa-east-1 com alertas (ofertas expiradas, falhas do provedor, assinaturas do Graph a vencer) e verificar alerta de teste disparado
-- [ ] 8.2 Rodar teste interno ponta a ponta com 2–3 fisios reais e verificar um agendamento completo família → fisio → Outlook → lembrete
+- [ ] 8.2 Rodar teste interno ponta a ponta com 2–3 fisios reais e verificar um agendamento completo família → fisio → agenda (Outlook e Google) → lembrete
 - [ ] 8.3 Revisar após 2 semanas de piloto o log de decisões (ocupação e km por fisio) e ajustar pesos; registrar ajustes em `design.md`
