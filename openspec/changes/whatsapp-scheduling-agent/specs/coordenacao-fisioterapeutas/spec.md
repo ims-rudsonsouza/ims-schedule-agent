@@ -18,7 +18,7 @@ O sistema SHALL enviar à fisioterapeuta uma oferta com data, horário, nome e i
 - **THEN** o agendamento é confirmado, o evento é criado na agenda dela e ela recebe o telefone do responsável
 
 ### Requirement: Prazo de resposta e próxima candidata
-Cada oferta individual SHALL ter prazo de resposta configurável (padrão 20 minutos; menor para pedidos no mesmo dia). Em caso de recusa ou estouro de prazo, o sistema SHALL ofertar à próxima candidata do ranking.
+Cada oferta individual SHALL ter prazo de resposta configurável (padrão 20 minutos; menor para pedidos no mesmo dia). Em caso de recusa ou estouro de prazo, o sistema SHALL ofertar à próxima candidata do ranking, exceto quando a fisio for a pedida pela família (ver requisito de recusa da fisio pedida).
 
 #### Scenario: Recusa
 - **WHEN** a fisio recusa a oferta
@@ -36,11 +36,11 @@ Na oferta aberta (sem fisio a até 10 km), o sistema SHALL enviar a oferta simul
 - **THEN** apenas o primeiro aceite registrado é confirmado e a segunda recebe "esse horário já foi preenchido, obrigado!"
 
 ### Requirement: Contraproposta da fisioterapeuta
-Além de aceitar ou recusar, a fisioterapeuta SHALL poder responder à oferta por texto livre sugerindo outro dia ou horário. O sistema SHALL interpretar a sugestão, verificar se cabe na agenda dela (com deslocamento) e, se couber, registrá-la como contraproposta para a família; se não couber, SHALL explicar o conflito e pedir outra sugestão.
+Além de aceitar ou recusar, a fisioterapeuta SHALL poder responder à oferta por texto livre sugerindo outro dia ou horário. O sistema SHALL interpretar a sugestão, verificar se cabe na agenda dela (com deslocamento) e, se couber, abrir uma negociação com a família; se não couber, SHALL explicar o conflito e pedir outra sugestão.
 
 #### Scenario: Fisio sugere outro horário
 - **WHEN** a fisio responde à oferta de terça 14h com "terça não dá, consigo quarta às 10h"
-- **THEN** o sistema confirma com ela "quarta 10h, certo? Vou consultar a família", verifica a agenda e registra a contraproposta
+- **THEN** o sistema confirma com ela "quarta 10h, certo? Vou consultar a família", verifica a agenda e abre a negociação
 
 #### Scenario: Sugestão conflita com a agenda dela
 - **WHEN** a fisio sugere quarta 10h mas já tem atendimento às 9h30 do outro lado da cidade
@@ -50,20 +50,50 @@ Além de aceitar ou recusar, a fisioterapeuta SHALL poder responder à oferta po
 - **WHEN** a fisio pergunta "a criança mora em casa ou apartamento?" antes de responder
 - **THEN** o agente responde com a informação do cadastro, ou diz que não tem e oferece perguntar à família, sem encerrar a oferta
 
-### Requirement: Encaminhamento da contraproposta à família
-Uma contraproposta SHALL encerrar a oferta original daquela fisio sem bloquear as demais candidatas para o horário original. O sistema SHALL apresentar a contraproposta à família quando nenhuma outra fisio aceitar o horário original, ou imediatamente quando a família tiver pedido aquela fisio especificamente. Se a família aceitar, o atendimento SHALL ser confirmado sem nova pergunta à fisio, após reverificar a agenda.
+### Requirement: Negociação exclusiva de dia e horário
+Uma contraproposta SHALL abrir uma negociação entre a família e aquela fisio, com o agente intermediando as mensagens, seja a fisio pedida pela família ou não. Durante a negociação, o pedido MUST NOT ser ofertado a nenhuma outra fisio. Um horário só é confirmado quando família e fisio concordam com ele e a agenda é reverificada.
 
-#### Scenario: Família com fisio preferida recebe a contraproposta
-- **WHEN** a família pediu a Ana e a Ana sugere quarta 10h no lugar de terça 14h
-- **THEN** a família recebe "A Ana não pode terça 14h, mas pode quarta às 10h. Fica bom?" e, se aceitar, o atendimento é confirmado e a Ana é avisada
+#### Scenario: Negociação até um acordo
+- **WHEN** a Ana sugere quarta 10h, a família responde "quarta só depois das 15h" e a Ana aceita quarta 16h
+- **THEN** o agente confere a agenda dela, confirma quarta 16h e avisa as duas partes
 
-#### Scenario: Outra fisio aceita o horário original
-- **WHEN** a Bia sugeriu outro horário, mas a Carla aceita o horário original em seguida
-- **THEN** o atendimento fica com a Carla e a Bia é avisada de que a sugestão não foi necessária
+#### Scenario: Nenhuma oferta paralela durante a negociação
+- **WHEN** a Bia, que não foi pedida pela família, está negociando o horário
+- **THEN** nenhuma outra fisio recebe oferta daquele pedido enquanto a negociação estiver aberta
 
-#### Scenario: Família recusa a contraproposta
-- **WHEN** a família não aceita o horário sugerido pela fisio
-- **THEN** a fisio é avisada e o agente oferece à família outros horários disponíveis
+#### Scenario: Negociação durante oferta aberta
+- **WHEN** numa oferta aberta a Carla sugere outro horário antes de qualquer aceite
+- **THEN** as ofertas abertas às demais fisios são suspensas e elas são avisadas de que o horário está em negociação
+
+### Requirement: Fim da negociação sem acordo
+A negociação SHALL terminar sem acordo quando a família ou a fisio desistir, ou quando passar o prazo máximo (padrão 2 horas, ou 3 rodadas sem acordo). Ao terminar sem acordo, o sistema SHALL avisar a fisio e seguir a regra de fallback: com fisio pedida, perguntar à família se outra fisio pode atender; sem fisio pedida, retomar a alocação com as próximas candidatas.
+
+#### Scenario: Família pediu a fisio e a negociação falha
+- **WHEN** a família pediu a Ana e não chegaram a um horário comum
+- **THEN** o agente diz à família que não foi possível com a Ana e pergunta se ela aceita ser atendida por outra fisio
+
+#### Scenario: Sem fisio pedida e a negociação falha
+- **WHEN** a família não pediu fisio e a negociação com a Bia termina sem acordo
+- **THEN** o sistema retoma as ofertas para as próximas candidatas, começando pelo horário escolhido pela família, se ainda estiver livre
+
+#### Scenario: Prazo da negociação esgotado
+- **WHEN** a negociação fica 2 horas sem acordo
+- **THEN** ela é encerrada sem acordo, as duas partes são avisadas e a regra de fallback é aplicada
+
+### Requirement: Recusa da fisio pedida pela família
+Quando a fisio pedida explicitamente pela família recusar a oferta ou deixar o prazo expirar, o sistema MUST NOT ofertar o pedido a outra fisio automaticamente. O agente SHALL avisar a família de que essa fisio não está disponível e perguntar se outra fisio pode atender; só com o "sim" da família o sistema SHALL seguir para a alocação normal sem a fisio pedida.
+
+#### Scenario: Ana recusa
+- **WHEN** a família pediu a Ana e a Ana recusa a oferta
+- **THEN** a família recebe "A Ana não está disponível nesse horário. Posso ver com outra fisioterapeuta?" e nenhuma outra fisio é acionada antes da resposta
+
+#### Scenario: Família aceita outra fisio
+- **WHEN** a família responde que pode ser outra fisio
+- **THEN** o sistema roda a alocação normal (raio, deslocamento, carga) sem a Ana e oferta o horário
+
+#### Scenario: Família prefere esperar a fisio pedida
+- **WHEN** a família responde que só quer a Ana
+- **THEN** o agente oferece os próximos horários livres da Ana
 
 ### Requirement: Aceite automático opcional
 Uma fisioterapeuta SHALL poder ser configurada com aceite automático; nesse caso o sistema MUST confirmar sem esperar resposta e apenas notificá-la do novo agendamento.

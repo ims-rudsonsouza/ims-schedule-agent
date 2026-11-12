@@ -14,7 +14,7 @@ Uma fisioterapeuta SHALL ser elegível para um horário somente se o intervalo c
 - **THEN** ela não é elegível para 14h
 
 ### Requirement: Preferência da família
-Quando a família indicar uma fisioterapeuta preferida, o sistema SHALL ofertar primeiro os horários dessa fisio, independentemente de distância e carga. Se ela não tiver horário na janela pedida, o sistema SHALL perguntar se a família prefere outro horário com ela ou outra fisio.
+Quando a família indicar uma fisioterapeuta preferida, o sistema SHALL ofertar primeiro os horários dessa fisio, independentemente de distância e carga. Se ela não tiver horário na janela pedida, o sistema SHALL perguntar se a família prefere outro horário com ela ou outra fisio. Outra fisio só SHALL ser considerada com a concordância da família.
 
 #### Scenario: Fisio preferida disponível
 - **WHEN** a família pede "quero com a Ana" e a Ana tem horário na janela
@@ -25,11 +25,15 @@ Quando a família indicar uma fisioterapeuta preferida, o sistema SHALL ofertar 
 - **THEN** o agente oferece os próximos horários da Ana e, como alternativa, horários com outra fisio
 
 ### Requirement: Continuidade do tratamento
-Para criança em tratamento, a fisioterapeuta que já a atende SHALL ser tratada como preferida, salvo se a família pedir outra.
+Para criança em tratamento, a fisioterapeuta que já a atende SHALL ser ofertada primeiro, salvo se a família pedir outra. Essa preferência implícita não exige perguntar à família antes de passar à próxima candidata se ela recusar.
 
 #### Scenario: Sessão de continuidade
 - **WHEN** uma criança atendida pela Bia nas últimas sessões pede nova sessão sem citar fisio
 - **THEN** a Bia é ofertada primeiro, se tiver horário
+
+#### Scenario: Fisio de continuidade recusa
+- **WHEN** a Bia, fisio de continuidade não pedida explicitamente, recusa a oferta
+- **THEN** a próxima candidata do ranking recebe a oferta e a família é informada de quem vai atender
 
 ### Requirement: Raio de 10 km
 Sem preferência, o sistema SHALL considerar primeiro as fisios elegíveis cuja distância de rota entre o ponto de partida no horário (residência ou atendimento anterior no dia) e o endereço da criança seja de até 10 km.

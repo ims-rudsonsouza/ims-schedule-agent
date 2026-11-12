@@ -40,8 +40,9 @@
 - [ ] 5.2 Implementar ofertas sequenciais com prazo, expiração e próxima candidata; verificar com relógio simulado
 - [ ] 5.3 Implementar oferta aberta com primeiro aceite vencedor e aviso de "preenchido"; verificar com teste de aceites concorrentes
 - [ ] 5.4 Implementar aceite automático, notificações de mudança e resumo diário; verificar pelos cenários da spec `coordenacao-fisioterapeutas`
-- [ ] 5.5 Implementar contraproposta da fisio (texto livre → `propor_alternativa`, validação na agenda, encaminhamento à família, descarte quando outra aceita o original) e perguntas sobre a oferta; verificar pelos cenários de contraproposta da spec `coordenacao-fisioterapeutas`
-- [ ] 5.6 Implementar comandos da fisio (agenda, indisponibilidade, repasse) com toolset restrito; verificar por teste que o toolset não acessa dados de outras famílias
+- [ ] 5.5 Implementar negociação exclusiva (texto livre → `propor_alternativa`, validação na agenda, intermediação família↔fisio, trava do pedido, suspensão de ofertas abertas, prazo e fallback) e perguntas sobre a oferta; verificar pelos cenários de negociação da spec `coordenacao-fisioterapeutas`
+- [ ] 5.6 Implementar a regra da fisio pedida (recusa/expiração volta à família, alocação sem ela só com o "sim" da família) e a diferença para a fisio de continuidade; verificar pelos cenários correspondentes das specs `coordenacao-fisioterapeutas` e `alocacao-fisioterapeuta`
+- [ ] 5.7 Implementar comandos da fisio (agenda, indisponibilidade, repasse) com toolset restrito; verificar por teste que o toolset não acessa dados de outras famílias
 
 ## 6. Conversa com responsáveis
 
