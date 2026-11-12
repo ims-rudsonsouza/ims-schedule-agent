@@ -13,6 +13,21 @@ Uma fisioterapeuta SHALL ser elegível para um horário somente se o intervalo c
 - **WHEN** a fisio tem disponibilidade às 14h mas termina outro atendimento às 13h50 a 25 minutos de distância
 - **THEN** ela não é elegível para 14h
 
+### Requirement: Antecedência mínima e atendimento todos os dias
+O sistema SHALL oferecer horários em qualquer dia da semana, inclusive fins de semana e feriados, sempre que houver bloco `Disponível`, e MUST NOT oferecer horário que comece em menos de 1 hora (antecedência mínima configurável). Para o mesmo dia, o horário SHALL deixar tempo para a fisio responder à oferta e se deslocar.
+
+#### Scenario: Pedido para daqui a 40 minutos
+- **WHEN** às 10h a família pede atendimento para 10h40
+- **THEN** o agente explica que precisa de pelo menos 1 hora e oferece os primeiros horários a partir das 11h
+
+#### Scenario: Feriado
+- **WHEN** a família pede atendimento num feriado e uma fisio tem bloco `Disponível` nesse dia
+- **THEN** o horário é oferecido normalmente
+
+#### Scenario: Deslocamento maior que a folga
+- **WHEN** às 10h a única fisio livre às 11h05 está a 50 minutos do endereço
+- **THEN** 11h05 não é oferecido com ela, porque não sobra tempo para a resposta e o deslocamento
+
 ### Requirement: Preferência da família
 Quando a família indicar uma fisioterapeuta preferida, o sistema SHALL ofertar primeiro os horários dessa fisio, independentemente de distância e carga. Se ela não tiver horário na janela pedida, o sistema SHALL perguntar se a família prefere outro horário com ela ou outra fisio. Outra fisio só SHALL ser considerada com a concordância da família.
 
@@ -32,14 +47,14 @@ Para criança em tratamento, a fisioterapeuta que já a atende SHALL ser ofertad
 - **THEN** a Bia é ofertada primeiro, se tiver horário
 
 ### Requirement: Raio de 10 km
-Sem preferência, o sistema SHALL considerar primeiro as fisios elegíveis cuja distância de rota entre o ponto de partida no horário (residência ou atendimento anterior no dia) e o endereço da criança seja de até 10 km.
+Sem preferência, o sistema SHALL considerar primeiro as fisios elegíveis cuja distância **por rota** (não em linha reta) entre o ponto de partida no horário (residência ou atendimento anterior no dia) e o endereço da criança seja de até 10 km.
 
 #### Scenario: Fisio vindo de atendimento próximo
 - **WHEN** a fisio mora a 18 km mas terá atendimento anterior a 3 km do novo endereço
 - **THEN** ela é considerada dentro do raio de 10 km para esse horário
 
 ### Requirement: Ranking por deslocamento e equilíbrio de carga
-Entre as fisios dentro do raio, o sistema SHALL ordenar por uma pontuação que combina o tempo de deslocamento adicional e a taxa de ocupação da fisio (horas agendadas sobre horas disponíveis no período), com pesos configuráveis. A ordem resultante SHALL definir a sequência das ofertas.
+Entre as fisios dentro do raio, o sistema SHALL ordenar por uma pontuação que combina o tempo de deslocamento adicional e a taxa de ocupação da fisio (número de atendimentos, contando 1 hora cada, sobre as horas disponíveis no período), com pesos configuráveis. A ordem resultante SHALL definir a sequência das ofertas.
 
 #### Scenario: Empate de distância
 - **WHEN** duas fisios estão a 15 minutos do endereço e uma tem 80% da agenda ocupada e a outra 20%
@@ -48,6 +63,10 @@ Entre as fisios dentro do raio, o sistema SHALL ordenar por uma pontuação que 
 #### Scenario: Diferença grande de distância
 - **WHEN** uma fisio está a 5 minutos com 60% de ocupação e outra a 35 minutos com 40%
 - **THEN** com os pesos padrão a fisio a 5 minutos é ofertada primeiro
+
+#### Scenario: Agenda mais extensa com mais pacientes
+- **WHEN** a Ana tem 20 h disponíveis e 8 atendimentos, a Bia tem 10 h e 6 atendimentos, e as duas estão à mesma distância
+- **THEN** a Ana é ofertada primeiro, porque a ocupação dela é de 40% e a da Bia é de 60%
 
 ### Requirement: Oferta aberta fora do raio
 Quando nenhuma fisio elegível estiver a até 10 km, o sistema SHALL abrir a oferta para todas as fisios com agenda disponível no horário de interesse, conforme a spec de coordenação.

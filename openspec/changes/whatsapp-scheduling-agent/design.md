@@ -17,13 +17,13 @@ Restrições: um desenvolvedor, ~2 meses até o piloto, 10 fisios hoje, dados de
 **Goals:**
 - O motor de alocação é **determinístico e testável**; o LLM conversa e chama ferramentas, mas não escolhe fisio nem inventa horário.
 - Separação rígida entre os dois papéis no mesmo número (família x fisio): prompts, ferramentas e dados diferentes.
-- Outlook continua sendo a agenda que as fisios usam no dia a dia; o sistema se adapta a edições manuais.
+- A agenda pessoal (Outlook ou Google) continua sendo o que as fisios usam no dia a dia; o sistema se adapta a edições manuais.
 
 **Non-Goals (MVP):**
-- Prontuário, evolução clínica, faturamento, convênios e pagamentos.
+- Prontuário, evolução clínica, faturamento, convênios e cobrança. O agente só informa valores e formas de pagamento quando a família pergunta; geração de link de pagamento e confirmação de pagamento ficam com a secretária.
 - Otimização de rotas completa (VRP/OR-Tools); usamos heurística gulosa por inserção.
 - Painel administrativo completo (apenas telas mínimas de cadastro e auditoria, ou planilha/Retool).
-- Agendamento recorrente automático de pacotes (ex.: 2x/semana por 5 semanas) — ver perguntas em aberto.
+- Pacotes ou séries de sessões reservados pelo agente. Pelo WhatsApp chega o primeiro contato, uma sessão por vez. As seguintes são combinadas pessoalmente entre família e fisio, e a fisio as registra pela conversa ou direto na agenda (D3).
 
 ## Arquitetura
 
@@ -51,7 +51,7 @@ Restrições: um desenvolvedor, ~2 meses até o piloto, 10 fisios hoje, dados de
 | Webhook API | Valida assinatura do provedor, deduplica por `message_id`, grava a mensagem e responde 200 rápido; o processamento segue em fila. |
 | Roteador de papel | Procura o telefone no cadastro de fisios e da equipe; caso contrário, trata como família. |
 | Orquestrador família | Claude com tool-use e prompt de "secretária"; ferramentas: `consultar_cadastro`, `registrar_consentimento`, `geocodificar_endereco`, `buscar_opcoes`, `solicitar_agendamento`, `cancelar`, `remarcar`, `transferir_humano`. |
-| Orquestrador fisio | Primeiro trata botões (Aceitar/Recusar) de forma determinística; texto livre vai a um LLM com ferramentas restritas (`detalhes_da_oferta`, `propor_alternativa`, `minha_agenda`, `informar_indisponibilidade`, `pedir_repasse`). |
+| Orquestrador fisio | Primeiro trata botões (Aceitar/Recusar) de forma determinística; texto livre vai a um LLM com ferramentas restritas (`detalhes_da_oferta`, `propor_alternativa`, `minha_agenda`, `registrar_sessao`, `informar_indisponibilidade`, `repassar`). |
 | Motor de agendamento | Calcula janelas livres, deslocamento, ranking, cria e encerra ofertas, confirma agendamentos. Sem LLM. |
 | Integração Outlook | Leitura (`calendarView`), escrita de eventos, assinaturas de notificação e `delta` como rede de segurança. |
 | Agendador de tarefas | Expiração de ofertas, próxima candidata, lembretes de véspera, resumo diário para fisios, renovação das assinaturas do Graph. |
@@ -68,9 +68,8 @@ Restrições: um desenvolvedor, ~2 meses até o piloto, 10 fisios hoje, dados de
 4. Necessidade: quando? (hoje / amanhã / dias e turnos) e preferência de fisio
    - checagem determinística de sinais de gravidade em toda mensagem -> orientação de emergência + humano
 5. buscar_opcoes -> o agente apresenta 2-3 opções reais ("1) Ter 14h com Ana  2) Ter 16h com Bia ...")
-6. Família escolhe -> solicitar_agendamento
-   a. fisio com aceite automático -> confirmado na hora
-   b. caso normal -> "Vou confirmar com a Ana e já te aviso" -> oferta à fisio (D3)
+6. Família escolhe -> solicitar_agendamento -> "Vou confirmar com a Ana e já te aviso" -> oferta à fisio (D3)
+   (sempre com aceite da fisio; não há confirmação automática)
 7. Confirmado -> resumo + .ics + lembrete de véspera agendado
    Sem aceite -> desculpas + novas opções ou humano
 ```
@@ -92,6 +91,15 @@ início + duração_sessão + margem_relatório + desloc(novo -> S) <= início(S
 
 Padrões: sessão 60 min, margem 10 min (configuráveis por tipo de serviço).
 
+**Antecedência e dias:** todos os dias da semana, inclusive fins de semana e feriados, valem desde que haja bloco `Disponível`; não há calendário de feriados no motor. Para cada candidato, o início precisa respeitar:
+
+```
+início >= agora + 1 h                                         (antecedência mínima, configurável)
+início >= agora + prazo_da_oferta + desloc(origem_atual -> novo) (tempo para responder e chegar)
+```
+
+A `origem_atual` é o atendimento em andamento ou anterior no dia, ou a residência. Pedidos com início em menos de 3 h são marcados `urgente`. Para eles, se não houver ninguém no raio, a oferta aberta sai na hora, e a família recebe o aviso "estou confirmando, te respondo em até X minutos". Na negociação de um pedido urgente, o prazo total é limitado pela mesma conta.
+
 **Passo 2 — Preferência.** Se há fisio preferida (escolhida pela família ou "fisio de continuidade" das últimas sessões), retornar só as janelas dela. Sem janela na faixa pedida: retornar as próximas janelas dela + até 2 alternativas de outras fisios, marcadas como tal.
 
 **Passo 3 — Raio de 10 km.** `dist_origem` = distância de rota entre a origem efetiva (P, ou residência se não houver P) e o endereço. Fisios com `dist_origem <= 10 km` formam o grupo **no raio**.
@@ -100,13 +108,16 @@ Padrões: sessão 60 min, margem 10 min (configuráveis por tipo de serviço).
 
 ```
 custo_desloc = desloc(P->novo) + desloc(novo->S) - desloc(P->S)     (minutos de deslocamento adicionados)
-ocupacao     = horas_agendadas / horas_disponíveis   (período: semana atual + próxima)
+ocupacao     = (nº de atendimentos no período × 1 h) / horas_disponíveis      (período: semana atual + próxima)
+  atendimentos      = os do sistema + sessões combinadas pessoalmente + eventos que a fisio criou na agenda dedicada,
+                      cada um contando 1 h (deslocamento e relatório não entram)
+  horas_disponíveis = soma dos blocos `Disponível` menos os compromissos pessoais que caem dentro deles
 score        = w_d * (custo_desloc / 60) + w_c * ocupacao
 padrões: w_d = 1,0 ; w_c = 1,0  ->  10 pontos percentuais de ocupação "valem" ~6 min de deslocamento
 ```
 
 - Usar **inserção** (custo adicional) e não apenas a distância da residência premia encaixar visitas vizinhas no mesmo roteiro.
-- Ocupação relativa à disponibilidade atende "parecido conforme a disponibilidade": uma fisio com 10 h livres e 5 atendimentos está tão ocupada quanto uma com 4 h e 2.
+- Ocupação = pacientes por hora disponível (definido pelo Rudson): quem tem agenda mais extensa pode ter mais pacientes sem ser penalizada. Exemplo: com 20 h disponíveis e 8 atendimentos (40%), uma fisio está menos ocupada que outra com 10 h e 6 atendimentos (60%), e por isso recebe a próxima oferta, mesmo já tendo mais pacientes.
 - Trava de justiça opcional: se a ocupação de uma fisio ultrapassar a média do grupo em mais de 25 pp, ela só é ofertada se não houver outra no raio.
 
 **Passo 5 — Fora do raio (oferta aberta).** Se o grupo no raio estiver vazio para o horário escolhido, criar uma **oferta aberta** para todas as fisios com o horário livre (Passo 1), qualquer distância. Primeira a aceitar fica com o atendimento.
@@ -130,37 +141,61 @@ Pedido:  COLETANDO -> OPCOES_ENVIADAS -> AGUARDANDO_FISIO -> CONFIRMADO
          CONFIRMADO -> CANCELADO | REMARCADO | A_VERIFICAR (edição externa no Outlook)
 Oferta:  ENVIADA -> ACEITA | RECUSADA | CONTRAPROPOSTA | EXPIRADA | PREENCHIDA (outra aceitou antes)
 Negociação: ABERTA -> ACORDO | SEM_ACORDO (desistência, 3 rodadas ou 2 h)
-Oferta aberta em suspensão: ENVIADA -> SUSPENSA (outra fisio negociando) -> ENVIADA | PREENCHIDA
+Oferta aberta em suspensão: ENVIADA -> SUSPENSA (rodada com a família) -> respondida (vai para a fila) | ENVIADA (fila vazia) | PREENCHIDA
+Fila da oferta aberta: [aceites do horário original no topo] + [propostas por ordem de chegada]; reordenada quando a família sugere um horário
 ```
 
-- **Sequencial** (grupo no raio): uma oferta por vez, prazo padrão 20 min (8 min para pedidos do mesmo dia). Recusa pelo botão ou expiração **não** dispara a próxima automaticamente: o pedido vai para `AGUARDANDO_FAMILIA` e a próxima candidata só recebe a oferta depois do "sim" da família.
+- **Sequencial** (grupo no raio): uma oferta por vez, prazo de 20 min em horário comercial (8h–18h) e de 10 h fora dele (madrugada), sempre limitado pela folga até o atendimento: 8 min para pedidos do mesmo dia e 5 min para início em menos de 2 h. Recusa pelo botão ou expiração **não** dispara a próxima automaticamente: o pedido vai para `AGUARDANDO_FAMILIA` e a próxima candidata só recebe a oferta depois do "sim" da família.
 - **Aberta** (fora do raio): todas ao mesmo tempo, prazo padrão 30 min. Recusas individuais não voltam à família; ela só é consultada se todas recusarem ou o prazo acabar sem aceite.
 - **Concorrência:** o aceite executa uma transação que (1) trava a linha do pedido (`SELECT ... FOR UPDATE`), (2) verifica que o pedido ainda está `AGUARDANDO_FISIO`, (3) reconsulta o Outlook daquele intervalo, (4) cria o evento, (5) marca `CONFIRMADO` e as demais ofertas `PREENCHIDA`. Restrição de exclusão no Postgres (`EXCLUDE USING gist` em fisio + intervalo) impede dois agendamentos sobrepostos para a mesma fisio mesmo com bug de aplicação.
 - Enquanto aguarda aceite, o horário fica **pré-reservado** no banco (não no Outlook), para não oferecer o mesmo horário a outra família.
 - Conteúdo da oferta: data, horário, nome e idade da criança, endereço completo, distância/tempo e, se houver, observação logística ("prédio sem elevador"). O telefone do responsável só vai à fisio confirmada.
 - **Negociação (conversa com a fisio):** a fisio pode responder por texto em vez de tocar nos botões. O LLM do papel fisio usa `propor_alternativa(oferta_id, inicio)`; o motor valida o horário na agenda dela com as mesmas regras de D2 (deslocamento, margem, conflitos) e, se não couber, o agente explica e pede outra opção. Uma proposta válida abre uma **negociação exclusiva**: o pedido fica travado para aquela fisio (nenhuma oferta sequencial nova; numa oferta aberta, as ofertas das demais ficam `SUSPENSA`) e o agente leva e traz as propostas entre família e fisio. Cada proposta validada é pré-reservada no banco enquanto a outra parte responde. Acordo = as duas partes disseram sim ao mesmo horário → reverificação da agenda e confirmação. Sem acordo (desistência, 3 rodadas ou 2 h, configuráveis): o pedido vai para `AGUARDANDO_FAMILIA` e o agente pergunta se pode verificar com outra fisio, tenha a família pedido aquela fisio ou não; com o "sim", a alocação é retomada sem ela (numa oferta aberta, as ofertas suspensas voltam a valer, se o horário ainda estiver livre).
+- **Fila da oferta aberta (definida pelo Rudson):** quando uma fisio propõe um ou mais horários numa oferta aberta, as propostas dela formam uma **rodada** enviada à família ("A Carla pode terça 16h ou quarta 9h. Alguma serve?"), e as ofertas às demais ficam `SUSPENSA`. As fisios suspensas ainda podem responder: a resposta entra numa fila, e elas recebem "obrigada! já estou vendo com a família e te aviso". Se a família recusar a rodada, a próxima da fila vira a nova rodada. Os aceites do horário original ficam no topo da fila, porque atendem exatamente o pedido da família, e as propostas seguem por ordem de chegada. Se a família recusar e sugerir um horário ("quinta de manhã"), o motor procura na fila a primeira resposta compatível com a sugestão (mesmo dia e turno, com folga de ±1 h) e a apresenta antes das outras. Se nenhuma for compatível, a sugestão da família é levada à fisio da rodada atual e a fila segue depois. Com a fila vazia, as ofertas suspensas voltam a valer até o prazo.
 - **Botão Recusar x resposta por texto:** o botão é a recusa explícita; o orquestrador da fisio trata o toque de forma determinística e o pedido vai para `AGUARDANDO_FAMILIA`, com a mensagem "A Bia não tem disponibilidade nesse horário. Posso verificar com outra fisioterapeuta, ou prefere outro horário com a Bia?". Isso vale para qualquer fisio, pedida pela família ou escolhida pelo ranking. Texto livre nunca é tratado como recusa: se indicar outro dia/horário, abre negociação; se for só uma negativa ("não posso"), o agente pergunta se ela quer recusar ou sugerir outro horário. O estouro do prazo é tratado como recusa.
+- **Sessões seguintes e repasses (como funciona hoje):** depois da primeira visita, família e fisio combinam as próximas pessoalmente, e havendo divergência a própria fisio passa o atendimento a uma colega. O sistema não tenta substituir isso. A fisio pode (a) dizer ao agente "marquei a próxima da Maria quinta 10h", e então o sistema valida a agenda, cria o atendimento vinculado à criança e manda a confirmação e o lembrete à família; ou (b) só criar o evento na agenda dedicada, e então ele conta como ocupado e entra na ocupação, sem mensagens à família. Repasse: `repassar(agendamento_id, colega?)`. Com colega indicada, a oferta vai só a ela; sem colega, roda a alocação sem a fisio original. O evento só muda de agenda quando a nova fisio aceita, e a família é avisada da troca.
 - Perguntas da fisio sobre a oferta ("tem elevador?", "a criança tem quantos meses?") são respondidas com `detalhes_da_oferta`; o que não estiver no cadastro pode ser perguntado à família pelo agente, sem encerrar a oferta. O prazo da oferta é estendido em 10 min enquanto houver conversa ativa.
 
-### D4. Integração com Outlook (Microsoft Graph)
+### D4. Integração com as agendas das fisios (Outlook e Google Agenda)
 
-**Modelo recomendado:** uma conta/caixa do Microsoft 365 da clínica ("o e-mail da agenda") com **uma agenda secundária por fisio**, compartilhada com cada fisio para ela ver (e, se desejado, editar) no Outlook do celular.
+**Modelo (definido pelo Rudson):** cada fisio tem **sua própria conta, com e-mail pessoal**, que pode ser Outlook.com/Hotmail (conta Microsoft) **ou Gmail** (Google Agenda). O sistema acessa a agenda de cada uma em nome dela, por um adaptador com duas implementações. As regras abaixo valem para as duas; os detalhes de cada provedor vêm no fim desta seção.
 
-Alternativa: cada fisio com sua própria caixa M365 licenciada. Mais custo de licença e mais permissões; só vale se as fisios já tiverem contas M365 da clínica.
+**Outlook (Microsoft Graph):**
 
-- **Autenticação:** app registrado no Entra ID com permissão de aplicativo `Calendars.ReadWrite`, **restrita à caixa da agenda** via RBAC for Applications / Application Access Policy do Exchange Online (o app não enxerga outras caixas da organização).
-- **Disponibilidade:** a fisio marca blocos de disponibilidade como eventos com a categoria `Disponível` (podem ser recorrentes) e `showAs = free`. Qualquer outro evento conta como ocupado. Leitura via `GET /users/{agenda}/calendars/{id}/calendarView?startDateTime=…&endDateTime=…` (expande recorrências).
-  - Alternativa: grade semanal de disponibilidade cadastrada no sistema e Outlook apenas para bloqueios. Mais simples de ler, porém obriga a fisio a manter dois lugares.
-- **Escrita:** `POST /users/{agenda}/calendars/{id}/events` com `transactionId` (idempotência) e uma *single-value extended property* com o id do agendamento, para reconhecer eventos do sistema.
-- **Sincronização:** assinatura de notificações de alteração por agenda (`/users/{agenda}/calendars/{id}/events`), renovada antes de expirar (≈3 dias), e `delta` de `calendarView` a cada 5 min como rede de segurança. Edição/exclusão manual de um evento do sistema → pedido `A_VERIFICAR` + pergunta à fisio pelo WhatsApp.
+- **Autenticação:** app registrado no Entra ID aceitando **contas Microsoft pessoais** (audiência `consumers` ou `common`), com **permissões delegadas** `Calendars.ReadWrite` e `offline_access`. Permissão de aplicativo (app-only) não funciona para contas pessoais. Cada fisio conecta a conta uma vez por um link enviado pelo WhatsApp (fluxo OAuth com código de autorização + PKCE) e consente. O refresh token fica criptografado (KMS) e é renovado a cada uso.
+- **Desconexão:** se o token for revogado, a senha mudar ou a conta ficar muito tempo sem uso, a renovação falha. A fisio deixa de receber ofertas, e ela e a equipe recebem um aviso com novo link de conexão.
+- **Agenda dedicada:** na conexão, o sistema cria na conta da fisio uma agenda chamada "Atendimentos IMS". Os blocos `Disponível` e os atendimentos ficam nela, e a fisio vê tudo no Outlook do celular junto com os compromissos pessoais.
+- **Disponibilidade:** blocos com a categoria `Disponível` (podem ser recorrentes) na agenda dedicada. Ocupado = qualquer evento na agenda dedicada ou na agenda principal da fisio que não esteja marcado como livre. Leitura via `GET /me/calendars/{id}/calendarView?startDateTime=…&endDateTime=…&$select=start,end,showAs,categories,isCancelled` (expande recorrências). Dos eventos pessoais o sistema lê **só início, fim e status**, nunca título, local ou participantes.
+- **Escrita:** `POST /me/calendars/{dedicada}/events` com `transactionId` (idempotência) e uma *single-value extended property* com o id do agendamento. O sistema só escreve na agenda dedicada.
+- **Sincronização:** assinatura de notificações de alteração por fisio (agenda dedicada e principal), renovada antes de expirar (≈3 dias), e `delta` de `calendarView` a cada 5 min como rede de segurança. Edição/exclusão manual de um evento do sistema → pedido `A_VERIFICAR` + pergunta à fisio pelo WhatsApp.
+- **Adaptador de agenda:** a integração fica atrás de uma interface (`conectar`, `ler_ocupacao`, `criar_evento`, `atualizar_evento`, `cancelar_evento`, `assinar_mudancas`, `sincronizar`). O motor de agendamento só conhece a interface, e o provedor de cada fisio fica no cadastro (`provedor_agenda`).
+
+**Google Agenda (Google Calendar API):**
+- **Autenticação:** projeto no Google Cloud com tela de consentimento OAuth externa e permissões delegadas com escopos mínimos: `calendar.app.created` (criar e gerenciar só as agendas criadas pelo app) e `calendar.freebusy` (ler apenas os horários ocupados das outras agendas). Mesmo fluxo de conexão por link no WhatsApp (OAuth + PKCE, `access_type=offline`), com refresh token criptografado.
+- **Verificação do app:** com a tela de consentimento em modo "Teste", o Google expira os refresh tokens em 7 dias, o que derrubaria a conexão das fisios toda semana. Antes do piloto, o app precisa ser publicado e passar pela verificação do Google para escopos sensíveis (política de privacidade publicada, domínio verificado e vídeo do fluxo). Contar algumas semanas para isso no cronograma.
+- **Agenda dedicada:** `calendars.insert` cria "Atendimentos IMS". Blocos `Disponível` e atendimentos ficam nela, e a fisio os vê no app Google Agenda.
+- **Disponibilidade:** eventos da agenda dedicada via `events.list` (`singleEvents=true` para expandir recorrências). A ocupação das agendas pessoais vem de `freeBusy.query`, que já devolve **só intervalos ocupados**, sem título nem local, o que atende o requisito de privacidade por construção.
+- **Escrita:** `events.insert` na agenda dedicada com `extendedProperties.private` contendo o id do agendamento, e um id de evento gerado pelo sistema para garantir idempotência.
+- **Sincronização:** `events.watch` (notificações push por webhook) na agenda dedicada, com o canal renovado antes de expirar, mais `syncToken` incremental a cada 5 min como rede de segurança. As agendas pessoais não emitem notificações com esses escopos, então a ocupação é consultada por `freeBusy` na hora de montar opções e de novo antes de confirmar.
+
+**Diferenças que o motor precisa saber:** no Outlook, uma mudança na agenda principal chega por notificação. No Google, o motor só descobre na próxima consulta de `freeBusy`. A reverificação antes de confirmar (spec `agenda-fisioterapeutas`) cobre os dois casos.
 - **Cache:** janela de agenda em Redis por fisio (TTL curto, invalidado pelas notificações); sempre reconsultar antes de confirmar.
 
 ### D5. WhatsApp e número único
 
+- **Número (definido pelo Rudson):** um número **novo**, que ainda não esteja registrado em nenhum app de WhatsApp. Antes de produção é preciso: (1) verificar a empresa no Meta Business Manager, com CNPJ, comprovante de endereço e domínio ou site da clínica; (2) registrar o número na WhatsApp Business Platform pelo provedor escolhido; (3) aprovar o nome de exibição (ex.: "IMS Fisioterapia"); (4) aprovar os templates. A verificação pode levar de alguns dias a algumas semanas, então ela começa na semana 1. Até lá, o desenvolvimento usa o sandbox do Twilio. Sem verificação, a conta fica com limite baixo de conversas iniciadas pela empresa, o que trava ofertas para as 10 fisios e lembretes às famílias.
 - **Provedor:** manter um adaptador de canal com duas implementações possíveis — Twilio (já decidido no design anterior; sandbox imediato) ou Meta Cloud API direta (mais barata por mensagem). Recomendação: começar no Twilio e migrar se o custo pesar.
 - **Roteamento:** papel decidido pelo telefone (cadastro de fisios e equipe). Fisio que fala como mãe de paciente escolhe o papel explicitamente; a sessão guarda o papel ativo por 2 h.
 - **Janela de 24 h:** ofertas, lembretes e avisos iniciados pelo sistema usam **templates de utilidade** aprovados com botões de resposta rápida: `oferta_atendimento`, `oferta_preenchida`, `oferta_expirada`, `confirmacao_agendamento`, `lembrete_vespera`, `aviso_cancelamento`, `resumo_agenda_dia`.
 - **Política da Meta para IA:** a Meta restringiu chatbots de IA de propósito geral na API do WhatsApp Business; um assistente restrito ao agendamento da clínica é uso de negócio permitido, mas o prompt deve recusar conversas fora do escopo. Confirmar a política vigente ao registrar o número.
+- **Secretária no mesmo número (definido pelo Rudson):** a secretária atende pelo celular, no mesmo número do agente. Isso depende da **coexistência** da Meta, que permite usar o mesmo número no app WhatsApp Business do celular e na API ao mesmo tempo, com as mensagens espelhadas nos dois lados. Implicações:
+  - O provedor precisa suportar coexistência. Isso tem que ser confirmado antes de fechar entre Twilio e Meta Cloud API direta (ou um BSP que suporte), e pode mudar a recomendação de provedor.
+  - A coexistência tem limites próprios (por exemplo, recursos do app que não funcionam com a API e regras de ativação do número). Eles precisam ser checados na documentação vigente da Meta no momento do registro.
+  - Toda mensagem enviada pela secretária pelo app chega ao sistema como eco. O agente usa esse eco para pausar a conversa automaticamente (`HUMANO_ATIVO`) e volta quando ela devolver a conversa (comando, por exemplo uma etiqueta ou "#bot") ou depois de 4 horas sem mensagens dela.
+  - As transferências do agente (gravidade, área fora, desconto, pedido explícito) chegam ao celular dela como uma conversa normal, com uma nota interna de contexto enviada ao número de alerta dela.
+  - **Plano B**, se a coexistência não for viável no provedor escolhido: uma caixa de entrada web responsiva (ex.: Chatwoot integrado à API), que a secretária abre no navegador do celular.
+- **Área atendida (definida pelo Rudson):** municípios de São Paulo, Osasco e Barueri, incluindo Alphaville. A checagem usa o município devolvido pela geocodificação. Alphaville também se estende por Santana de Parnaíba (ver perguntas em aberto). Fora da área, o agente passa para a secretária.
+- **Valores:** tabela configurável (tipo de serviço → valor), usada só quando a família pergunta. Atendimento apenas particular; formas de pagamento: Pix, transferência ou link de pagamento. Desconto, parcelamento e envio de link ficam com a secretária.
 - **Humanização:** respostas curtas, indicador de "digitando", leve atraso proporcional ao tamanho do texto, emojis com moderação, nome da clínica, nunca fingir ser humano.
 
 ### D6. LLM e salvaguardas
@@ -178,7 +213,7 @@ Alternativa: cada fisio com sua própria caixa M365 licenciada. Mais custo de li
 | Responsavel | id, telefone, nome, consentimento_em, versao_aviso |
 | Crianca | id, responsavel_id, nome, data_nascimento, fisio_continuidade_id |
 | Endereco | id, responsavel_id, texto, complemento, geom (PostGIS) |
-| Fisioterapeuta | id, nome, telefone, residencia_geom, outlook_calendar_id, aceite_automatico, ativa |
+| Fisioterapeuta | id, nome, telefone, residencia_geom, provedor_agenda, agenda_dedicada_id, token_ref (segredo criptografado), conexao_status, ativa |
 | Pedido | id, crianca_id, endereco_id, janela, preferencia_fisio_id, estado, urgente |
 | Oferta | id, pedido_id, fisio_id, inicio, fim, modo (sequencial/aberta), estado, expira_em |
 | Agendamento | id, pedido_id, fisio_id, intervalo (tstzrange), outlook_event_id, estado |
@@ -190,8 +225,8 @@ Alternativa: cada fisio com sua própria caixa M365 licenciada. Mais custo de li
 - **Base legal:** dados de saúde (art. 11) e de crianças (art. 14) → consentimento específico e destacado de pai/mãe ou responsável legal, além da tutela da saúde quando aplicável; registrar prova do consentimento.
 - **Minimização:** sem diagnóstico no WhatsApp nem no Outlook; evento com primeiro nome/iniciais, endereço, telefone do responsável e código. Ofertas levam nome, idade e endereço da criança (necessários para a fisio decidir), mas não telefone do responsável nem dados clínicos. Como a oferta aberta envia esses dados a várias fisios, o aviso de privacidade deve dizer isso e as fisios devem assinar termo de confidencialidade; mensagens já entregues no celular delas não podem ser apagadas pelo sistema.
 - **Operadores e transferência internacional (art. 33):** Twilio/Meta, Microsoft, Google e Anthropic processam dados fora do Brasil em parte; listar todos no aviso de privacidade e firmar DPAs. Banco e backups em sa-east-1.
-- **Retenção:** histórico de conversa 90 dias; agendamentos pelo prazo que a clínica definir (ver perguntas); exclusão sob pedido.
-- **Segurança:** TLS, criptografia em repouso (RDS/KMS), segredos no Secrets Manager, log de acesso humano, princípio do menor privilégio no Graph (D4).
+- **Retenção (definida pelo Rudson):** o histórico de atendimentos é mantido permanentemente. A finalidade (continuidade do cuidado e registro da clínica) precisa constar no aviso de privacidade. Num pedido de exclusão, guarda-se só o que for obrigação legal, com acesso restrito, e o resto é apagado ou anonimizado. O histórico bruto das conversas no WhatsApp segue com prazo de 90 dias (ver perguntas em aberto).
+- **Segurança:** TLS, criptografia em repouso (RDS/KMS), segredos no Secrets Manager, log de acesso humano, princípio do menor privilégio no Graph (D4): o sistema lê só horários das agendas pessoais e escreve só na agenda dedicada, no Outlook e no Google; tokens das fisios criptografados e revogáveis. O Google passa a ser operador (Google Calendar API) e deve constar no aviso de privacidade.
 - Revisão por profissional de LGPD antes do piloto com dados reais.
 
 ### D9. Infraestrutura
@@ -200,7 +235,9 @@ Mantida a do design anterior: AWS sa-east-1, FastAPI em App Runner/Fargate, RDS 
 
 ## Risks / Trade-offs
 
-- [Fisios não respondem rápido às ofertas] → prazos curtos, aceite automático opcional, ondas paralelas configuráveis e alerta para a equipe humana.
+- [Fisios não respondem rápido às ofertas] → prazos curtos, lembrete de oferta pendente na metade do prazo, ondas paralelas configuráveis e alerta para a equipe humana (não há aceite automático, por decisão do Rudson).
+- [Verificação do app no Google atrasa o piloto ou tokens expiram em 7 dias no modo Teste] → iniciar a verificação na fase de fundação; no piloto interno, usar contas Outlook ou aceitar a reconexão semanal.
+- [Fisio revoga o acesso ou o token expira] → status de conexão monitorado, fisio sai das ofertas até reconectar, aviso com link para ela e para a equipe.
 - [Agenda no Outlook fica desatualizada ou é usada de forma inconsistente] → convenção simples (categoria `Disponível`), resumo diário pelo WhatsApp para a fisio conferir, sincronização por notificação + delta.
 - [Família espera demais pela confirmação] → mensagem honesta de "estou confirmando", prazo máximo por pedido (ex.: 60 min) antes de oferecer alternativas ou humano.
 - [Dados da criança em celulares de fisios que não ficaram com o atendimento] → termo de confidencialidade, oferta sem telefone e sem dados clínicos, aviso de privacidade explícito.
@@ -215,26 +252,26 @@ Mantida a do design anterior: AWS sa-east-1, FastAPI em App Runner/Fargate, RDS 
 
 ## Migration Plan
 
-Projeto novo, sem migração de dados. Implantação em etapas: (1) sandbox do WhatsApp com a equipe interna, (2) piloto com 2–3 fisios e famílias convidadas, (3) todas as 10 fisios. Rollback: desligar o webhook e voltar ao atendimento humano no mesmo número (o provedor permite redirecionar para a caixa de atendimento).
+Projeto novo, sem migração de dados. Implantação em etapas: (0) verificação da empresa na Meta e registro do número novo, em paralelo ao desenvolvimento, (1) sandbox do WhatsApp com a equipe interna, (2) piloto com 2–3 fisios e famílias convidadas, (3) todas as 10 fisios. Rollback: desligar o webhook e voltar ao atendimento humano no mesmo número (o provedor permite redirecionar para a caixa de atendimento).
 
 ## Open Questions
 
 As respostas abaixo ajustam parâmetros e detalhes; onde não houver resposta, vale a suposição indicada.
 
-1. **Agenda:** "um e-mail com atualização no Outlook" é uma única conta M365 da clínica com uma agenda por fisio (suposição) ou cada fisio tem conta própria? As fisios usam e-mail pessoal (Gmail/Outlook.com) para ver a agenda?
-2. **Como as fisios informam disponibilidade hoje?** Suposição: blocos `Disponível` no Outlook. Alternativa: grade semanal no sistema.
-3. **Aceite da fisio:** toda marcação precisa de aceite (suposição) ou algumas fisios aceitam automaticamente?
-4. **Raio de 10 km:** contar a partir da residência e também do atendimento anterior do dia (suposição) ou só da residência? Distância de rota (suposição) ou em linha reta?
-5. **Equilíbrio:** medir por horas agendadas sobre disponíveis em 2 semanas (suposição) ou por número de pacientes ativos?
-6. **Pacotes e recorrência:** o tratamento costuma ser em pacotes (ex.: 10 sessões, 2x/semana)? Se sim, o agente deve reservar a série toda com a mesma fisio?
-7. **Urgência:** há atendimento no mesmo dia, fins de semana e feriados? Qual antecedência mínima?
-8. **Duração:** a sessão é sempre de 60 min + 10 min de relatório?
-9. **Equipe humana:** quem recebe as transferências e em que horário? Existe um número atual da secretária que será migrado?
-10. **Número de WhatsApp:** número novo ou o atual da clínica? A empresa já tem Meta Business verificada?
-11. **Prazo de resposta das fisios:** 20 min é aceitável? E de madrugada, ofertas ficam para a manhã?
-12. **Valores, convênio e pagamento** ficam fora do agente no MVP (suposição)?
-13. **Área atendida:** quais cidades/bairros? Fora dela o agente recusa ou passa para humano?
-14. **Nome da fisio nas opções:** mostrar o nome da fisio nas opções à família (suposição) ou só após o aceite?
-15. **Oferta aberta e negociação:** suposição de que, se uma fisio propõe outro horário numa oferta aberta, as ofertas às demais ficam suspensas até o fim da negociação. Confirmar.
-16. **Prazo da negociação:** 2 horas ou 3 rodadas sem acordo é razoável?
-17. **Retenção de agendamentos:** por quanto tempo a clínica precisa guardar o histórico de atendimentos?
+1. ~~**Agenda:** uma conta da clínica ou uma por fisio?~~ **Respondido:** cada fisio tem conta própria, com e-mail pessoal. Também pode haver fisio com Gmail, então o sistema suporta Outlook e Google Agenda (D4).
+2. ~~**Como as fisios informam disponibilidade?**~~ **Respondido:** a fisio cria blocos `Disponível` na agenda dedicada (Outlook ou Google), como descrito em D4.
+3. ~~**Pacotes e recorrência**~~ **Respondido:** pelo WhatsApp chega o primeiro contato, uma sessão por vez. As seguintes são combinadas pessoalmente entre família e fisio e registradas por ela (D3); em caso de divergência, a própria fisio repassa o atendimento a uma colega.
+4. ~~**Urgência**~~ **Respondido:** há atendimento no mesmo dia, em fins de semana e feriados; antecedência mínima de 1 hora (D2).
+5. ~~**Aceite da fisio**~~ **Respondido:** a fisio sempre precisa aceitar; não há aceite automático.
+6. ~~**Número de WhatsApp**~~ **Respondido:** número novo, que precisa ser verificado na Meta Business (D5).
+7. ~~**Raio de 10 km**~~ **Respondido:** distância por rota. Ainda vale a suposição de origem: residência ou atendimento anterior do dia.
+8. ~~**Equilíbrio**~~ **Respondido:** número de atendimentos (1 h cada) sobre horas disponíveis (D2).
+9. ~~**Oferta aberta e negociação**~~ **Respondido:** propostas viram rodadas para a família, as demais ofertas ficam suspensas com as respostas em fila, e respostas compatíveis com a sugestão da família têm prioridade (D3).
+10. ~~**Prazo da negociação**~~ **Respondido:** 2 horas ou 3 rodadas sem acordo.
+11. ~~**Prazo de resposta das fisios**~~ **Respondido:** 20 min em horário comercial e 10 h de madrugada, limitado pela antecedência do atendimento. Pendente: confirmar a faixa do horário comercial (suposição: 8h–18h, todos os dias).
+12. ~~**Duração**~~ **Respondido:** o atendimento conta 1 h no registro, e a agenda reserva mais 10 min de relatório, além do deslocamento.
+13. ~~**Nome da fisio nas opções**~~ **Respondido:** sim, as opções mostram o nome da fisio quando a família não pediu uma específica.
+14. ~~**Equipe humana**~~ **Respondido:** a secretária, direto no celular, no mesmo número do agente (coexistência, D5). Pendente: confirmar que o provedor escolhido suporta coexistência; se não suportar, usar o plano B (caixa de entrada web).
+15. ~~**Área atendida**~~ **Respondido:** São Paulo, Osasco e Barueri (Alphaville). Pendente: a parte de Alphaville que fica em Santana de Parnaíba também é atendida? (suposição: sim)
+16. ~~**Valores e pagamento**~~ **Respondido:** só se a família perguntar; apenas particular; Pix, transferência ou link de pagamento. Pendente: a tabela de valores por tipo de atendimento.
+17. ~~**Retenção**~~ **Respondido:** manter sempre o histórico de atendimentos. Pendente: o histórico bruto das conversas no WhatsApp também deve ser mantido para sempre, ou pode ser apagado após 90 dias? (suposição: 90 dias, por minimização)

@@ -18,11 +18,26 @@ O sistema SHALL enviar à fisioterapeuta uma oferta com data, horário, nome e i
 - **THEN** o agendamento é confirmado, o evento é criado na agenda dela e ela recebe o telefone do responsável
 
 ### Requirement: Prazo de resposta
-Cada oferta individual SHALL ter prazo de resposta configurável (padrão 20 minutos; menor para pedidos no mesmo dia). O estouro do prazo SHALL ser tratado como recusa pelo botão.
+Cada oferta individual SHALL ter prazo de resposta configurável: 20 minutos quando enviada em horário comercial (padrão 8h–18h) e 10 horas quando enviada fora dele (madrugada). O estouro do prazo SHALL ser tratado como recusa pelo botão.
 
 #### Scenario: Prazo esgotado
 - **WHEN** o prazo termina sem resposta da fisio
 - **THEN** a oferta expira, a fisio é avisada de que expirou e a família é consultada como em uma recusa
+
+#### Scenario: Oferta enviada de madrugada
+- **WHEN** às 23h a família pede atendimento para depois de amanhã às 14h
+- **THEN** a fisio tem até 9h do dia seguinte para responder e a família é avisada de que a confirmação sai pela manhã
+
+### Requirement: Prazo limitado pela hora do atendimento
+O prazo de resposta MUST NOT passar do limite em que a fisio ainda consegue responder e chegar ao atendimento. Para atendimentos próximos, o prazo SHALL ser reduzido (padrão 8 minutos no mesmo dia e 5 minutos para início em menos de 2 horas).
+
+#### Scenario: Oferta de madrugada para atendimento cedo
+- **WHEN** às 2h a família pede atendimento para as 8h do mesmo dia
+- **THEN** o prazo é encurtado pela regra de antecedência e deslocamento, em vez de esperar 10 horas
+
+#### Scenario: Oferta para daqui a 1h30
+- **WHEN** às 10h uma oferta é enviada para um atendimento às 11h30
+- **THEN** a fisio tem 5 minutos para responder
 
 ### Requirement: Botão Recusar volta à família
 Quando a fisio tocar em "Recusar" na oferta de um horário escolhido pela família, o sistema MUST NOT ofertar o pedido a outra fisio automaticamente, seja a fisio pedida pela família ou não. O agente SHALL informar à família que a fisio não tem disponibilidade e perguntar se pode verificar com outra fisio; só com o "sim" da família o sistema SHALL buscar outra.
@@ -44,11 +59,34 @@ Quando a fisio tocar em "Recusar" na oferta de um horário escolhido pela famíl
 - **THEN** o agente trata a mensagem como proposta de outro dia/horário e inicia uma negociação, sem consultar a família sobre outra fisio
 
 ### Requirement: Oferta aberta com primeira resposta vencedora
-Na oferta aberta (sem fisio a até 10 km), o sistema SHALL enviar a oferta simultaneamente a todas as fisios elegíveis, e SHALL atribuir o atendimento à primeira que aceitar. As demais SHALL ser avisadas de que o horário foi preenchido. A família SHALL ser consultada somente quando todas recusarem ou o prazo acabar sem aceite.
+Na oferta aberta (sem fisio a até 10 km), o sistema SHALL enviar a oferta simultaneamente a todas as fisios elegíveis, e SHALL atribuir o atendimento à primeira que aceitar enquanto nenhuma rodada de propostas estiver com a família. As demais SHALL ser avisadas de que o horário foi preenchido. A família SHALL ser consultada somente quando todas recusarem ou o prazo acabar sem aceite.
 
 #### Scenario: Duas fisios aceitam quase ao mesmo tempo
 - **WHEN** duas fisios aceitam a mesma oferta aberta com segundos de diferença
 - **THEN** apenas o primeiro aceite registrado é confirmado e a segunda recebe "esse horário já foi preenchido, obrigado!"
+
+### Requirement: Fila de respostas na oferta aberta
+Na oferta aberta, quando uma fisio propuser um ou mais horários, o sistema SHALL enviar essas opções à família como uma rodada e suspender as demais ofertas. Respostas que chegarem durante a suspensão SHALL entrar numa fila, sem serem descartadas. Se a família recusar a rodada, o sistema SHALL apresentar a próxima resposta da fila. Se a família recusar e sugerir um horário, uma resposta da fila compatível com essa sugestão SHALL ter prioridade sobre a ordem da fila.
+
+#### Scenario: Fisio propõe dois horários
+- **WHEN** numa oferta aberta para terça 14h a Carla responde "posso terça 16h ou quarta 9h"
+- **THEN** a família recebe as duas opções da Carla e as ofertas às outras fisios ficam suspensas
+
+#### Scenario: Família recusa a rodada
+- **WHEN** a família recusa as opções da Carla e na fila há uma proposta da Dani para quarta 15h
+- **THEN** a família recebe a opção da Dani e a Carla é avisada de que a família não aceitou
+
+#### Scenario: Família sugere horário que está na fila
+- **WHEN** a família recusa as opções da Carla e diz "quinta de manhã seria melhor", e na fila há a Dani com quarta 15h e depois a Edu com quinta 9h
+- **THEN** a opção da Edu (quinta 9h) é apresentada primeiro, por ser compatível com o pedido da família
+
+#### Scenario: Aceite do horário original durante a suspensão
+- **WHEN** enquanto a família avalia as opções da Carla a Dani toca em "Aceitar" o horário original
+- **THEN** o aceite da Dani entra no topo da fila e é apresentado à família logo depois da rodada atual, se a família não aceitar as opções da Carla
+
+#### Scenario: Fila vazia
+- **WHEN** a família recusa a rodada e não há mais respostas na fila
+- **THEN** as ofertas suspensas voltam a valer até o prazo, e a família é consultada sobre outros horários se ninguém mais responder
 
 ### Requirement: Contraproposta da fisioterapeuta
 Além dos botões, a fisioterapeuta SHALL poder responder à oferta por texto livre. Quando o texto indicar a intenção de outro dia ou horário, o sistema SHALL tratá-lo como proposta (e não como recusa), interpretar a sugestão, verificar se cabe na agenda dela (com deslocamento) e, se couber, abrir uma negociação com a família; se não couber, SHALL explicar o conflito e pedir outra sugestão.
@@ -78,7 +116,7 @@ Uma contraproposta SHALL abrir uma negociação entre a família e aquela fisio,
 
 #### Scenario: Negociação durante oferta aberta
 - **WHEN** numa oferta aberta a Carla sugere outro horário antes de qualquer aceite
-- **THEN** as ofertas abertas às demais fisios são suspensas e elas são avisadas de que o horário está em negociação
+- **THEN** as ofertas abertas às demais fisios são suspensas e as opções da Carla seguem para a família, conforme o requisito de fila da oferta aberta
 
 ### Requirement: Fim da negociação sem acordo
 A negociação SHALL terminar sem acordo quando a família ou a fisio desistir, ou quando passar o prazo máximo (padrão 2 horas, ou 3 rodadas sem acordo). Ao terminar sem acordo, o sistema SHALL avisar a fisio e perguntar à família se pode verificar com outra fisio, inclusive quando a família tiver pedido aquela fisio; só com o "sim" da família o sistema SHALL buscar outra.
@@ -95,12 +133,16 @@ A negociação SHALL terminar sem acordo quando a família ou a fisio desistir, 
 - **WHEN** a negociação fica 2 horas sem acordo
 - **THEN** ela é encerrada sem acordo, as duas partes são avisadas e a família é consultada sobre outra fisio
 
-### Requirement: Aceite automático opcional
-Uma fisioterapeuta SHALL poder ser configurada com aceite automático; nesse caso o sistema MUST confirmar sem esperar resposta e apenas notificá-la do novo agendamento.
+### Requirement: Aceite obrigatório da fisioterapeuta
+Todo atendimento oferecido pelo sistema MUST ser aceito pela fisioterapeuta antes da confirmação à família, seja pelo botão "Aceitar" ou concordando com um horário na negociação. O sistema MUST NOT confirmar um atendimento só porque o horário está livre na agenda. Sessões que a própria fisio registra pela conversa contam como aceitas por ela.
 
-#### Scenario: Fisio com aceite automático
-- **WHEN** a alocação escolhe uma fisio com aceite automático
-- **THEN** o agendamento é confirmado imediatamente e ela recebe a notificação com os dados completos
+#### Scenario: Horário livre sem resposta da fisio
+- **WHEN** a fisio tem o horário livre na agenda mas ainda não respondeu à oferta
+- **THEN** a família continua com o status "confirmando com a fisio" e nada é gravado como confirmado
+
+#### Scenario: Sessão registrada pela própria fisio
+- **WHEN** a fisio escreve "marquei a próxima da Maria quinta 10h"
+- **THEN** o atendimento é confirmado sem nova oferta a ela
 
 ### Requirement: Notificações de mudanças
 O sistema SHALL notificar a fisioterapeuta por WhatsApp sobre cancelamentos e remarcações dos seus atendimentos, e SHALL enviar um resumo da agenda do dia seguinte em horário configurável.
@@ -110,8 +152,34 @@ O sistema SHALL notificar a fisioterapeuta por WhatsApp sobre cancelamentos e re
 - **THEN** a fisio recebe aviso com data e horário cancelados
 
 ### Requirement: Comandos da fisioterapeuta
-A fisioterapeuta SHALL poder, pela conversa, consultar sua agenda, avisar indisponibilidade pontual e pedir para repassar um atendimento já aceito; o repasse SHALL disparar nova alocação e só liberar a fisio original quando outra aceitar ou a família for avisada.
+A fisioterapeuta SHALL poder, pela conversa, consultar sua agenda e avisar indisponibilidade pontual.
 
-#### Scenario: Fisio pede repasse
-- **WHEN** a fisio escreve "não vou conseguir ir na de quinta 14h"
-- **THEN** o sistema confirma qual atendimento, inicia nova alocação e avisa a equipe humana se ninguém aceitar
+#### Scenario: Consulta da agenda
+- **WHEN** a fisio escreve "o que eu tenho amanhã?"
+- **THEN** o agente lista os atendimentos do dia seguinte com horário, nome da criança e bairro
+
+### Requirement: Sessões seguintes combinadas pessoalmente
+As sessões seguintes de um tratamento são combinadas pessoalmente entre a família e a fisio. O sistema SHALL permitir que a fisio as registre pela conversa ("marquei a próxima da Maria quinta 10h") e SHALL tratar como ocupado qualquer evento que ela crie direto na agenda dedicada. Sessões registradas pela conversa SHALL receber evento na agenda e lembrete de véspera para a família.
+
+#### Scenario: Fisio registra a próxima sessão pelo WhatsApp
+- **WHEN** a fisio escreve "marquei com a Maria quinta às 10h"
+- **THEN** o agente confirma a criança e o horário, verifica a agenda, cria o atendimento e a família recebe a confirmação e, depois, o lembrete de véspera
+
+#### Scenario: Fisio cria o evento direto na agenda
+- **WHEN** a fisio cria na agenda dedicada um evento que o sistema não criou
+- **THEN** o horário passa a contar como ocupado e entra no cálculo de ocupação dela, sem enviar mensagens à família
+
+### Requirement: Repasse entre fisioterapeutas
+A fisioterapeuta SHALL poder repassar um atendimento já marcado: para uma colega que ela indicar, ou pedindo ao sistema que procure outra. O atendimento SHALL só sair da agenda da fisio original quando outra aceitar, e a família SHALL ser avisada de quem vai atender.
+
+#### Scenario: Repasse para colega indicada
+- **WHEN** a fisio escreve "a Bia vai atender a Maria na quinta 10h no meu lugar"
+- **THEN** a Bia recebe a oferta e, se aceitar, o evento passa para a agenda dela e a família é avisada da troca
+
+#### Scenario: Repasse sem colega indicada
+- **WHEN** a fisio escreve "não vou conseguir ir na de quinta 14h, pode ver outra?"
+- **THEN** o sistema confirma qual atendimento, roda a alocação sem ela e avisa a equipe humana se ninguém aceitar
+
+#### Scenario: Colega indicada recusa
+- **WHEN** a Bia recusa o repasse
+- **THEN** a fisio original é avisada e o agente pergunta se ela quer indicar outra colega ou deixar o sistema procurar
