@@ -19,11 +19,12 @@
 
 ## 3. Integração Outlook
 
-- [ ] 3.1 Registrar app no Entra ID com `Calendars.ReadWrite` restrito à caixa da agenda e verificar que o app não lê outra caixa do tenant
-- [ ] 3.2 Implementar leitura de disponibilidade (blocos `Disponível` menos eventos ocupados) e verificar com testes usando respostas gravadas do Graph
-- [ ] 3.3 Implementar criação/atualização/cancelamento de eventos com `transactionId` e propriedade estendida; verificar idempotência por teste
-- [ ] 3.4 Implementar assinaturas de notificação, renovação automática e delta de segurança; verificar que exclusão manual marca o agendamento como `A_VERIFICAR`
-- [ ] 3.5 Documentar em `docs/outlook.md` a convenção de disponibilidade para as fisios
+- [ ] 3.1 Registrar app no Entra ID para contas Microsoft pessoais com permissões delegadas `Calendars.ReadWrite` + `offline_access` e implementar o fluxo de conexão (link pelo WhatsApp, OAuth + PKCE, token criptografado, criação da agenda dedicada); verificar conectando uma conta Outlook.com de teste
+- [ ] 3.2 Implementar monitoramento da conexão (renovação de token, falha → fisio sai das ofertas + aviso com link); verificar por teste com token revogado
+- [ ] 3.3 Implementar leitura de disponibilidade (blocos `Disponível` da agenda dedicada menos eventos ocupados da dedicada e da principal, lendo só início/fim/status) e verificar com testes usando respostas gravadas do Graph
+- [ ] 3.4 Implementar criação/atualização/cancelamento de eventos com `transactionId` e propriedade estendida; verificar idempotência por teste
+- [ ] 3.5 Implementar assinaturas de notificação, renovação automática e delta de segurança; verificar que exclusão manual marca o agendamento como `A_VERIFICAR`
+- [ ] 3.6 Documentar em `docs/outlook.md` a convenção de disponibilidade para as fisios
 
 ## 4. Motor de alocação
 
