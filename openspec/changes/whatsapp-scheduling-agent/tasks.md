@@ -11,11 +11,12 @@
 
 ## 2. Canal WhatsApp
 
-- [ ] 2.1 Implementar adaptador de canal (interface + implementação Twilio) com validação de assinatura e verificar por teste que webhook com assinatura inválida é rejeitado
-- [ ] 2.2 Implementar deduplicação por id da mensagem e fila de processamento; verificar por teste que webhook duplicado gera uma única resposta
-- [ ] 2.3 Implementar roteador de papel por telefone (família, fisio, equipe, papel ambíguo) e verificar pelos cenários da spec `canal-whatsapp`
-- [ ] 2.4 Redigir e submeter os templates de utilidade de D5; verificar aprovação no painel do provedor
-- [ ] 2.5 Documentar em `docs/whatsapp.md` como configurar número, sandbox e templates
+- [ ] 2.1 Iniciar a verificação da empresa no Meta Business Manager e reservar o número novo (sem uso em nenhum app de WhatsApp); verificar status "Verificado" no Business Manager antes do grupo 8
+- [ ] 2.2 Implementar adaptador de canal (interface + implementação Twilio) com validação de assinatura e verificar por teste que webhook com assinatura inválida é rejeitado
+- [ ] 2.3 Implementar deduplicação por id da mensagem e fila de processamento; verificar por teste que webhook duplicado gera uma única resposta
+- [ ] 2.4 Implementar roteador de papel por telefone (família, fisio, equipe, papel ambíguo) e verificar pelos cenários da spec `canal-whatsapp`
+- [ ] 2.5 Registrar o número novo e o nome de exibição no provedor, redigir e submeter os templates de utilidade de D5; verificar aprovação no painel do provedor
+- [ ] 2.6 Documentar em `docs/whatsapp.md` como configurar número, sandbox e templates
 
 ## 3. Integração com as agendas (Outlook e Google)
 

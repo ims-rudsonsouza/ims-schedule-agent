@@ -179,6 +179,7 @@ Oferta aberta em suspensão: ENVIADA -> SUSPENSA (outra fisio negociando) -> ENV
 
 ### D5. WhatsApp e número único
 
+- **Número (definido pelo Rudson):** um número **novo**, que ainda não esteja registrado em nenhum app de WhatsApp. Antes de produção é preciso: (1) verificar a empresa no Meta Business Manager, com CNPJ, comprovante de endereço e domínio ou site da clínica; (2) registrar o número na WhatsApp Business Platform pelo provedor escolhido; (3) aprovar o nome de exibição (ex.: "IMS Fisioterapia"); (4) aprovar os templates. A verificação pode levar de alguns dias a algumas semanas, então ela começa na semana 1. Até lá, o desenvolvimento usa o sandbox do Twilio. Sem verificação, a conta fica com limite baixo de conversas iniciadas pela empresa, o que trava ofertas para as 10 fisios e lembretes às famílias.
 - **Provedor:** manter um adaptador de canal com duas implementações possíveis — Twilio (já decidido no design anterior; sandbox imediato) ou Meta Cloud API direta (mais barata por mensagem). Recomendação: começar no Twilio e migrar se o custo pesar.
 - **Roteamento:** papel decidido pelo telefone (cadastro de fisios e equipe). Fisio que fala como mãe de paciente escolhe o papel explicitamente; a sessão guarda o papel ativo por 2 h.
 - **Janela de 24 h:** ofertas, lembretes e avisos iniciados pelo sistema usam **templates de utilidade** aprovados com botões de resposta rápida: `oferta_atendimento`, `oferta_preenchida`, `oferta_expirada`, `confirmacao_agendamento`, `lembrete_vespera`, `aviso_cancelamento`, `resumo_agenda_dia`.
@@ -239,7 +240,7 @@ Mantida a do design anterior: AWS sa-east-1, FastAPI em App Runner/Fargate, RDS 
 
 ## Migration Plan
 
-Projeto novo, sem migração de dados. Implantação em etapas: (1) sandbox do WhatsApp com a equipe interna, (2) piloto com 2–3 fisios e famílias convidadas, (3) todas as 10 fisios. Rollback: desligar o webhook e voltar ao atendimento humano no mesmo número (o provedor permite redirecionar para a caixa de atendimento).
+Projeto novo, sem migração de dados. Implantação em etapas: (0) verificação da empresa na Meta e registro do número novo, em paralelo ao desenvolvimento, (1) sandbox do WhatsApp com a equipe interna, (2) piloto com 2–3 fisios e famílias convidadas, (3) todas as 10 fisios. Rollback: desligar o webhook e voltar ao atendimento humano no mesmo número (o provedor permite redirecionar para a caixa de atendimento).
 
 ## Open Questions
 
@@ -250,7 +251,7 @@ As respostas abaixo ajustam parâmetros e detalhes; onde não houver resposta, v
 3. ~~**Pacotes e recorrência**~~ **Respondido:** pelo WhatsApp chega o primeiro contato, uma sessão por vez. As seguintes são combinadas pessoalmente entre família e fisio e registradas por ela (D3); em caso de divergência, a própria fisio repassa o atendimento a uma colega.
 4. ~~**Urgência**~~ **Respondido:** há atendimento no mesmo dia, em fins de semana e feriados; antecedência mínima de 1 hora (D2).
 5. ~~**Aceite da fisio**~~ **Respondido:** a fisio sempre precisa aceitar; não há aceite automático.
-6. **Número de WhatsApp:** número novo ou o atual da clínica? A empresa já tem Meta Business verificada?
+6. ~~**Número de WhatsApp**~~ **Respondido:** número novo, que precisa ser verificado na Meta Business (D5).
 7. **Raio de 10 km:** contar a partir da residência e também do atendimento anterior do dia (suposição) ou só da residência? Distância de rota (suposição) ou em linha reta?
 8. **Equilíbrio:** medir por horas agendadas sobre disponíveis em 2 semanas (suposição) ou por número de pacientes ativos?
 9. **Oferta aberta e negociação:** suposição de que, se uma fisio propõe outro horário numa oferta aberta, as ofertas às demais ficam suspensas até o fim da negociação. Confirmar.
