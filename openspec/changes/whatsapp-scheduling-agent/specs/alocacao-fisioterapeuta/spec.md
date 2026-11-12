@@ -25,15 +25,11 @@ Quando a família indicar uma fisioterapeuta preferida, o sistema SHALL ofertar 
 - **THEN** o agente oferece os próximos horários da Ana e, como alternativa, horários com outra fisio
 
 ### Requirement: Continuidade do tratamento
-Para criança em tratamento, a fisioterapeuta que já a atende SHALL ser ofertada primeiro, salvo se a família pedir outra. Essa preferência implícita não exige perguntar à família antes de passar à próxima candidata se ela recusar.
+Para criança em tratamento, a fisioterapeuta que já a atende SHALL ser ofertada primeiro, salvo se a família pedir outra.
 
 #### Scenario: Sessão de continuidade
 - **WHEN** uma criança atendida pela Bia nas últimas sessões pede nova sessão sem citar fisio
 - **THEN** a Bia é ofertada primeiro, se tiver horário
-
-#### Scenario: Fisio de continuidade recusa
-- **WHEN** a Bia, fisio de continuidade não pedida explicitamente, recusa a oferta
-- **THEN** a próxima candidata do ranking recebe a oferta e a família é informada de quem vai atender
 
 ### Requirement: Raio de 10 km
 Sem preferência, o sistema SHALL considerar primeiro as fisios elegíveis cuja distância de rota entre o ponto de partida no horário (residência ou atendimento anterior no dia) e o endereço da criança seja de até 10 km.

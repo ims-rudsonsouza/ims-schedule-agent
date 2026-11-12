@@ -75,7 +75,7 @@ Restrições: um desenvolvedor, ~2 meses até o piloto, 10 fisios hoje, dados de
    Sem aceite -> desculpas + novas opções ou humano
 ```
 
-Quando a família não tem preferência, as opções podem vir de fisios diferentes; a opção 1 é sempre a mais bem ranqueada. Se a família escolher uma opção, a oferta vai **primeiro** à fisio daquela opção; se ela recusar, o motor procura outra fisio **no mesmo horário** antes de voltar à família. Exceção: se a família **pediu** aquela fisio, a recusa volta para a família, que decide se aceita outra fisio (D3).
+Quando a família não tem preferência, as opções podem vir de fisios diferentes; a opção 1 é sempre a mais bem ranqueada. Se a família escolher uma opção, a oferta vai à fisio daquela opção. Se ela tocar em **Recusar** (ou deixar o prazo expirar), o agente volta à família, informa que a fisio não tem disponibilidade e pergunta se pode verificar com outra fisio; só com o "sim" o motor procura outra fisio no mesmo horário. Se ela responder por texto com outro dia/horário, abre-se uma negociação (D3).
 
 Alternativa considerada: perguntar à fisio antes de mostrar opções à família. Descartada porque deixa a família esperando sem saber o que escolher; mostrar opções reais e confirmar depois é o que uma secretária faz.
 
@@ -124,8 +124,8 @@ Máquinas de estado:
 ```
 Pedido:  COLETANDO -> OPCOES_ENVIADAS -> AGUARDANDO_FISIO -> CONFIRMADO
                                               |-> NEGOCIANDO (com 1 fisio) -> CONFIRMADO | SEM_ACORDO
-                                              |-> AGUARDANDO_FAMILIA (fisio pedida recusou / sem acordo) -> nova alocação | horários da fisio pedida
-         SEM_ACORDO -> AGUARDANDO_FAMILIA (com fisio pedida) | AGUARDANDO_FISIO (próximas candidatas)
+                                              |-> AGUARDANDO_FAMILIA (fisio recusou / expirou) -> nova alocação | horários da mesma fisio
+         SEM_ACORDO -> AGUARDANDO_FAMILIA
                                               |-> SEM_ACEITE -> (novas opções | humano)
          CONFIRMADO -> CANCELADO | REMARCADO | A_VERIFICAR (edição externa no Outlook)
 Oferta:  ENVIADA -> ACEITA | RECUSADA | CONTRAPROPOSTA | EXPIRADA | PREENCHIDA (outra aceitou antes)
@@ -133,13 +133,13 @@ Negociação: ABERTA -> ACORDO | SEM_ACORDO (desistência, 3 rodadas ou 2 h)
 Oferta aberta em suspensão: ENVIADA -> SUSPENSA (outra fisio negociando) -> ENVIADA | PREENCHIDA
 ```
 
-- **Sequencial** (grupo no raio): uma oferta por vez, prazo padrão 20 min (8 min para pedidos do mesmo dia). Recusa ou expiração dispara a próxima.
-- **Aberta** (fora do raio): todas ao mesmo tempo, prazo padrão 30 min.
+- **Sequencial** (grupo no raio): uma oferta por vez, prazo padrão 20 min (8 min para pedidos do mesmo dia). Recusa pelo botão ou expiração **não** dispara a próxima automaticamente: o pedido vai para `AGUARDANDO_FAMILIA` e a próxima candidata só recebe a oferta depois do "sim" da família.
+- **Aberta** (fora do raio): todas ao mesmo tempo, prazo padrão 30 min. Recusas individuais não voltam à família; ela só é consultada se todas recusarem ou o prazo acabar sem aceite.
 - **Concorrência:** o aceite executa uma transação que (1) trava a linha do pedido (`SELECT ... FOR UPDATE`), (2) verifica que o pedido ainda está `AGUARDANDO_FISIO`, (3) reconsulta o Outlook daquele intervalo, (4) cria o evento, (5) marca `CONFIRMADO` e as demais ofertas `PREENCHIDA`. Restrição de exclusão no Postgres (`EXCLUDE USING gist` em fisio + intervalo) impede dois agendamentos sobrepostos para a mesma fisio mesmo com bug de aplicação.
 - Enquanto aguarda aceite, o horário fica **pré-reservado** no banco (não no Outlook), para não oferecer o mesmo horário a outra família.
 - Conteúdo da oferta: data, horário, nome e idade da criança, endereço completo, distância/tempo e, se houver, observação logística ("prédio sem elevador"). O telefone do responsável só vai à fisio confirmada.
-- **Negociação (conversa com a fisio):** a fisio pode responder por texto em vez de tocar nos botões. O LLM do papel fisio usa `propor_alternativa(oferta_id, inicio)`; o motor valida o horário na agenda dela com as mesmas regras de D2 (deslocamento, margem, conflitos) e, se não couber, o agente explica e pede outra opção. Uma proposta válida abre uma **negociação exclusiva**: o pedido fica travado para aquela fisio (nenhuma oferta sequencial nova; numa oferta aberta, as ofertas das demais ficam `SUSPENSA`) e o agente leva e traz as propostas entre família e fisio. Cada proposta validada é pré-reservada no banco enquanto a outra parte responde. Acordo = as duas partes disseram sim ao mesmo horário → reverificação da agenda e confirmação. Sem acordo (desistência, 3 rodadas ou 2 h, configuráveis): com fisio pedida, o pedido vai para `AGUARDANDO_FAMILIA` e o agente pergunta se outra fisio pode atender; sem fisio pedida, a alocação é retomada pelas próximas candidatas (ofertas suspensas voltam a valer, se o horário ainda estiver livre).
-- **Fisio pedida recusa ou deixa expirar:** nada é ofertado a outra fisio. O pedido vai para `AGUARDANDO_FAMILIA` e o agente pergunta à família: "A Ana não está disponível nesse horário. Posso ver com outra fisioterapeuta, ou prefere outro horário com a Ana?". Só com o "sim" a alocação normal roda sem ela. A fisio de continuidade (preferência implícita) não segue essa regra: a recusa dela passa direto para a próxima candidata, e a família é informada de quem vai atender.
+- **Negociação (conversa com a fisio):** a fisio pode responder por texto em vez de tocar nos botões. O LLM do papel fisio usa `propor_alternativa(oferta_id, inicio)`; o motor valida o horário na agenda dela com as mesmas regras de D2 (deslocamento, margem, conflitos) e, se não couber, o agente explica e pede outra opção. Uma proposta válida abre uma **negociação exclusiva**: o pedido fica travado para aquela fisio (nenhuma oferta sequencial nova; numa oferta aberta, as ofertas das demais ficam `SUSPENSA`) e o agente leva e traz as propostas entre família e fisio. Cada proposta validada é pré-reservada no banco enquanto a outra parte responde. Acordo = as duas partes disseram sim ao mesmo horário → reverificação da agenda e confirmação. Sem acordo (desistência, 3 rodadas ou 2 h, configuráveis): o pedido vai para `AGUARDANDO_FAMILIA` e o agente pergunta se pode verificar com outra fisio, tenha a família pedido aquela fisio ou não; com o "sim", a alocação é retomada sem ela (numa oferta aberta, as ofertas suspensas voltam a valer, se o horário ainda estiver livre).
+- **Botão Recusar x resposta por texto:** o botão é a recusa explícita; o orquestrador da fisio trata o toque de forma determinística e o pedido vai para `AGUARDANDO_FAMILIA`, com a mensagem "A Bia não tem disponibilidade nesse horário. Posso verificar com outra fisioterapeuta, ou prefere outro horário com a Bia?". Isso vale para qualquer fisio, pedida pela família ou escolhida pelo ranking. Texto livre nunca é tratado como recusa: se indicar outro dia/horário, abre negociação; se for só uma negativa ("não posso"), o agente pergunta se ela quer recusar ou sugerir outro horário. O estouro do prazo é tratado como recusa.
 - Perguntas da fisio sobre a oferta ("tem elevador?", "a criança tem quantos meses?") são respondidas com `detalhes_da_oferta`; o que não estiver no cadastro pode ser perguntado à família pelo agente, sem encerrar a oferta. O prazo da oferta é estendido em 10 min enquanto houver conversa ativa.
 
 ### D4. Integração com Outlook (Microsoft Graph)
@@ -204,7 +204,8 @@ Mantida a do design anterior: AWS sa-east-1, FastAPI em App Runner/Fargate, RDS 
 - [Agenda no Outlook fica desatualizada ou é usada de forma inconsistente] → convenção simples (categoria `Disponível`), resumo diário pelo WhatsApp para a fisio conferir, sincronização por notificação + delta.
 - [Família espera demais pela confirmação] → mensagem honesta de "estou confirmando", prazo máximo por pedido (ex.: 60 min) antes de oferecer alternativas ou humano.
 - [Dados da criança em celulares de fisios que não ficaram com o atendimento] → termo de confidencialidade, oferta sem telefone e sem dados clínicos, aviso de privacidade explícito.
-- [Negociação exclusiva com uma fisio atrasa o agendamento] → prazo máximo de negociação (2 h / 3 rodadas), avisos às duas partes antes de expirar e fallback automático para as próximas candidatas quando não há fisio pedida.
+- [Negociação exclusiva com uma fisio atrasa o agendamento] → prazo máximo de negociação (2 h / 3 rodadas), avisos às duas partes antes de expirar e consulta à família sobre outra fisio ao final.
+- [Família consultada a cada recusa demora mais para ter um agendamento] → botões "Pode ser outra" / "Prefiro esperar" na pergunta, para resposta em um toque.
 - [Suspender a oferta aberta pode irritar fisios que queriam o horário] → mensagem clara de "em negociação" e reenvio da oferta se a negociação falhar.
 - [Mistura de papéis no mesmo número] → roteamento por telefone, toolsets separados, testes específicos de vazamento de dados entre papéis.
 - [LLM inventa horário ou promete o que não pode] → validação servidor-side das opções, temperatura baixa, testes de regressão de conversa.
