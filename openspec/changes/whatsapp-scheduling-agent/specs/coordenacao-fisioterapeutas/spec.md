@@ -110,8 +110,34 @@ O sistema SHALL notificar a fisioterapeuta por WhatsApp sobre cancelamentos e re
 - **THEN** a fisio recebe aviso com data e horário cancelados
 
 ### Requirement: Comandos da fisioterapeuta
-A fisioterapeuta SHALL poder, pela conversa, consultar sua agenda, avisar indisponibilidade pontual e pedir para repassar um atendimento já aceito; o repasse SHALL disparar nova alocação e só liberar a fisio original quando outra aceitar ou a família for avisada.
+A fisioterapeuta SHALL poder, pela conversa, consultar sua agenda e avisar indisponibilidade pontual.
 
-#### Scenario: Fisio pede repasse
-- **WHEN** a fisio escreve "não vou conseguir ir na de quinta 14h"
-- **THEN** o sistema confirma qual atendimento, inicia nova alocação e avisa a equipe humana se ninguém aceitar
+#### Scenario: Consulta da agenda
+- **WHEN** a fisio escreve "o que eu tenho amanhã?"
+- **THEN** o agente lista os atendimentos do dia seguinte com horário, nome da criança e bairro
+
+### Requirement: Sessões seguintes combinadas pessoalmente
+As sessões seguintes de um tratamento são combinadas pessoalmente entre a família e a fisio. O sistema SHALL permitir que a fisio as registre pela conversa ("marquei a próxima da Maria quinta 10h") e SHALL tratar como ocupado qualquer evento que ela crie direto na agenda dedicada. Sessões registradas pela conversa SHALL receber evento na agenda e lembrete de véspera para a família.
+
+#### Scenario: Fisio registra a próxima sessão pelo WhatsApp
+- **WHEN** a fisio escreve "marquei com a Maria quinta às 10h"
+- **THEN** o agente confirma a criança e o horário, verifica a agenda, cria o atendimento e a família recebe a confirmação e, depois, o lembrete de véspera
+
+#### Scenario: Fisio cria o evento direto na agenda
+- **WHEN** a fisio cria na agenda dedicada um evento que o sistema não criou
+- **THEN** o horário passa a contar como ocupado e entra no cálculo de ocupação dela, sem enviar mensagens à família
+
+### Requirement: Repasse entre fisioterapeutas
+A fisioterapeuta SHALL poder repassar um atendimento já marcado: para uma colega que ela indicar, ou pedindo ao sistema que procure outra. O atendimento SHALL só sair da agenda da fisio original quando outra aceitar, e a família SHALL ser avisada de quem vai atender.
+
+#### Scenario: Repasse para colega indicada
+- **WHEN** a fisio escreve "a Bia vai atender a Maria na quinta 10h no meu lugar"
+- **THEN** a Bia recebe a oferta e, se aceitar, o evento passa para a agenda dela e a família é avisada da troca
+
+#### Scenario: Repasse sem colega indicada
+- **WHEN** a fisio escreve "não vou conseguir ir na de quinta 14h, pode ver outra?"
+- **THEN** o sistema confirma qual atendimento, roda a alocação sem ela e avisa a equipe humana se ninguém aceitar
+
+#### Scenario: Colega indicada recusa
+- **WHEN** a Bia recusa o repasse
+- **THEN** a fisio original é avisada e o agente pergunta se ela quer indicar outra colega ou deixar o sistema procurar

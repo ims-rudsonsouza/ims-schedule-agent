@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Conduzir, pelo WhatsApp e em tom humanizado, a conversa com pais e responsáveis para agendar, remarcar e cancelar sessões domiciliares de fisioterapia respiratória infantil.
+Conduzir, pelo WhatsApp e em tom humanizado, a conversa com pais e responsáveis para agendar, remarcar e cancelar sessões domiciliares de fisioterapia respiratória infantil. O foco é o primeiro contato, uma sessão por vez; as sessões seguintes são combinadas pessoalmente com a fisio.
 
 ## ADDED Requirements
 
@@ -22,7 +22,7 @@ Antes de buscar horários, o agente SHALL obter: nome do responsável, nome e id
 
 #### Scenario: Responsável recorrente
 - **WHEN** um responsável já cadastrado pede nova sessão
-- **THEN** o agente confirma "mesmo endereço (Rua X, 123)?" em vez de pedir tudo de novo
+- **THEN** o agente confirma "mesmo endereço (Rua X, 123)?" em vez de pedir tudo de novo e pergunta se quer manter a mesma fisio
 
 #### Scenario: Endereço ambíguo
 - **WHEN** o endereço informado não pode ser localizado com precisão
