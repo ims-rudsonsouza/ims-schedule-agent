@@ -259,7 +259,7 @@ As respostas abaixo ajustam parâmetros e detalhes; onde não houver resposta, v
 9. **Oferta aberta e negociação:** suposição de que, se uma fisio propõe outro horário numa oferta aberta, as ofertas às demais ficam suspensas até o fim da negociação. Confirmar.
 10. **Prazo da negociação:** 2 horas ou 3 rodadas sem acordo é razoável?
 11. **Prazo de resposta das fisios:** 20 min é aceitável? E de madrugada, ofertas ficam para a manhã?
-12. **Duração:** para registro o atendimento dura 1 h (respondido). Pendente: a margem de 10 min para relatório entre visitas continua valendo na hora de montar a agenda? (suposição: sim)
+12. ~~**Duração**~~ **Respondido:** o atendimento conta 1 h no registro, e a agenda reserva mais 10 min de relatório, além do deslocamento.
 13. **Nome da fisio nas opções:** mostrar o nome da fisio nas opções à família (suposição) ou só após o aceite?
 14. **Equipe humana:** quem recebe as transferências e em que horário? Existe um número atual da secretária que será migrado?
 15. **Área atendida:** quais cidades/bairros? Fora dela o agente recusa ou passa para humano?
