@@ -51,7 +51,7 @@ Restrições: um desenvolvedor, ~2 meses até o piloto, 10 fisios hoje, dados de
 | Webhook API | Valida assinatura do provedor, deduplica por `message_id`, grava a mensagem e responde 200 rápido; o processamento segue em fila. |
 | Roteador de papel | Procura o telefone no cadastro de fisios e da equipe; caso contrário, trata como família. |
 | Orquestrador família | Claude com tool-use e prompt de "secretária"; ferramentas: `consultar_cadastro`, `registrar_consentimento`, `geocodificar_endereco`, `buscar_opcoes`, `solicitar_agendamento`, `cancelar`, `remarcar`, `transferir_humano`. |
-| Orquestrador fisio | Primeiro trata botões (Aceitar/Recusar) de forma determinística; texto livre vai a um LLM com ferramentas restritas (`minha_agenda`, `informar_indisponibilidade`, `pedir_repasse`). |
+| Orquestrador fisio | Primeiro trata botões (Aceitar/Recusar) de forma determinística; texto livre vai a um LLM com ferramentas restritas (`detalhes_da_oferta`, `propor_alternativa`, `minha_agenda`, `informar_indisponibilidade`, `pedir_repasse`). |
 | Motor de agendamento | Calcula janelas livres, deslocamento, ranking, cria e encerra ofertas, confirma agendamentos. Sem LLM. |
 | Integração Outlook | Leitura (`calendarView`), escrita de eventos, assinaturas de notificação e `delta` como rede de segurança. |
 | Agendador de tarefas | Expiração de ofertas, próxima candidata, lembretes de véspera, resumo diário para fisios, renovação das assinaturas do Graph. |
@@ -123,16 +123,20 @@ Máquinas de estado:
 
 ```
 Pedido:  COLETANDO -> OPCOES_ENVIADAS -> AGUARDANDO_FISIO -> CONFIRMADO
+                                              |-> CONTRAPROPOSTA_FAMILIA -> CONFIRMADO | (novas opções)
                                               |-> SEM_ACEITE -> (novas opções | humano)
          CONFIRMADO -> CANCELADO | REMARCADO | A_VERIFICAR (edição externa no Outlook)
-Oferta:  ENVIADA -> ACEITA | RECUSADA | EXPIRADA | PREENCHIDA (outra aceitou antes)
+Oferta:  ENVIADA -> ACEITA | RECUSADA | CONTRAPROPOSTA | EXPIRADA | PREENCHIDA (outra aceitou antes)
+Contraproposta: PENDENTE -> APRESENTADA -> ACEITA_FAMILIA | RECUSADA_FAMILIA | DESCARTADA (outra fisio aceitou o original)
 ```
 
 - **Sequencial** (grupo no raio): uma oferta por vez, prazo padrão 20 min (8 min para pedidos do mesmo dia). Recusa ou expiração dispara a próxima.
 - **Aberta** (fora do raio): todas ao mesmo tempo, prazo padrão 30 min.
 - **Concorrência:** o aceite executa uma transação que (1) trava a linha do pedido (`SELECT ... FOR UPDATE`), (2) verifica que o pedido ainda está `AGUARDANDO_FISIO`, (3) reconsulta o Outlook daquele intervalo, (4) cria o evento, (5) marca `CONFIRMADO` e as demais ofertas `PREENCHIDA`. Restrição de exclusão no Postgres (`EXCLUDE USING gist` em fisio + intervalo) impede dois agendamentos sobrepostos para a mesma fisio mesmo com bug de aplicação.
 - Enquanto aguarda aceite, o horário fica **pré-reservado** no banco (não no Outlook), para não oferecer o mesmo horário a outra família.
-- Conteúdo da oferta: data, horário, bairro, distância/tempo, idade da criança e, se houver, observação logística ("prédio sem elevador"). Nome e endereço completo só após aceite.
+- Conteúdo da oferta: data, horário, nome e idade da criança, endereço completo, distância/tempo e, se houver, observação logística ("prédio sem elevador"). O telefone do responsável só vai à fisio confirmada.
+- **Contraproposta (conversa com a fisio):** a fisio pode responder por texto em vez de tocar nos botões. O LLM do papel fisio usa `propor_alternativa(oferta_id, inicio)`; o motor valida o horário na agenda dela com as mesmas regras de D2 (deslocamento, margem, conflitos) e, se não couber, o agente explica e pede outra opção. Uma contraproposta válida encerra a oferta original **daquela fisio** e a sequência segue para a próxima candidata no horário original, porque o horário que a família escolheu tem prioridade. A contraproposta é mostrada à família (a) imediatamente, se a família pediu aquela fisio, ou (b) quando o horário original terminar sem aceite, junto com outras opções. Se outra fisio aceitar o original, a contraproposta é `DESCARTADA` e a fisio é avisada. Aceite da família confirma direto (a fisio já se comprometeu), com reverificação da agenda; o horário sugerido fica pré-reservado por até 2 h enquanto a família decide.
+- Perguntas da fisio sobre a oferta ("tem elevador?", "a criança tem quantos meses?") são respondidas com `detalhes_da_oferta`; o que não estiver no cadastro pode ser perguntado à família pelo agente, sem encerrar a oferta. O prazo da oferta é estendido em 10 min enquanto houver conversa ativa.
 
 ### D4. Integração com Outlook (Microsoft Graph)
 
@@ -180,7 +184,7 @@ Alternativa: cada fisio com sua própria caixa M365 licenciada. Mais custo de li
 ### D8. LGPD e dados de crianças
 
 - **Base legal:** dados de saúde (art. 11) e de crianças (art. 14) → consentimento específico e destacado de pai/mãe ou responsável legal, além da tutela da saúde quando aplicável; registrar prova do consentimento.
-- **Minimização:** sem diagnóstico no WhatsApp nem no Outlook; evento com primeiro nome/iniciais, endereço, telefone do responsável e código. Ofertas sem nome e endereço completo.
+- **Minimização:** sem diagnóstico no WhatsApp nem no Outlook; evento com primeiro nome/iniciais, endereço, telefone do responsável e código. Ofertas levam nome, idade e endereço da criança (necessários para a fisio decidir), mas não telefone do responsável nem dados clínicos. Como a oferta aberta envia esses dados a várias fisios, o aviso de privacidade deve dizer isso e as fisios devem assinar termo de confidencialidade; mensagens já entregues no celular delas não podem ser apagadas pelo sistema.
 - **Operadores e transferência internacional (art. 33):** Twilio/Meta, Microsoft, Google e Anthropic processam dados fora do Brasil em parte; listar todos no aviso de privacidade e firmar DPAs. Banco e backups em sa-east-1.
 - **Retenção:** histórico de conversa 90 dias; agendamentos pelo prazo que a clínica definir (ver perguntas); exclusão sob pedido.
 - **Segurança:** TLS, criptografia em repouso (RDS/KMS), segredos no Secrets Manager, log de acesso humano, princípio do menor privilégio no Graph (D4).
@@ -195,6 +199,8 @@ Mantida a do design anterior: AWS sa-east-1, FastAPI em App Runner/Fargate, RDS 
 - [Fisios não respondem rápido às ofertas] → prazos curtos, aceite automático opcional, ondas paralelas configuráveis e alerta para a equipe humana.
 - [Agenda no Outlook fica desatualizada ou é usada de forma inconsistente] → convenção simples (categoria `Disponível`), resumo diário pelo WhatsApp para a fisio conferir, sincronização por notificação + delta.
 - [Família espera demais pela confirmação] → mensagem honesta de "estou confirmando", prazo máximo por pedido (ex.: 60 min) antes de oferecer alternativas ou humano.
+- [Dados da criança em celulares de fisios que não ficaram com o atendimento] → termo de confidencialidade, oferta sem telefone e sem dados clínicos, aviso de privacidade explícito.
+- [Negociação com a fisio deixa a família esperando] → horário original continua sendo ofertado às outras candidatas em paralelo à contraproposta; prazo máximo por pedido.
 - [Mistura de papéis no mesmo número] → roteamento por telefone, toolsets separados, testes específicos de vazamento de dados entre papéis.
 - [LLM inventa horário ou promete o que não pode] → validação servidor-side das opções, temperatura baixa, testes de regressão de conversa.
 - [Custo de APIs de rota] → pré-filtro geográfico e cache por geohash.
@@ -222,5 +228,5 @@ As respostas abaixo ajustam parâmetros e detalhes; onde não houver resposta, v
 11. **Prazo de resposta das fisios:** 20 min é aceitável? E de madrugada, ofertas ficam para a manhã?
 12. **Valores, convênio e pagamento** ficam fora do agente no MVP (suposição)?
 13. **Área atendida:** quais cidades/bairros? Fora dela o agente recusa ou passa para humano?
-14. **Nome da fisio antes do aceite:** mostrar o nome da fisio nas opções à família (suposição) ou só após o aceite?
+14. **Nome da fisio nas opções:** mostrar o nome da fisio nas opções à família (suposição) ou só após o aceite?
 15. **Retenção de agendamentos:** por quanto tempo a clínica precisa guardar o histórico de atendimentos?

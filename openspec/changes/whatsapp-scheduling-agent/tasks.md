@@ -40,7 +40,8 @@
 - [ ] 5.2 Implementar ofertas sequenciais com prazo, expiração e próxima candidata; verificar com relógio simulado
 - [ ] 5.3 Implementar oferta aberta com primeiro aceite vencedor e aviso de "preenchido"; verificar com teste de aceites concorrentes
 - [ ] 5.4 Implementar aceite automático, notificações de mudança e resumo diário; verificar pelos cenários da spec `coordenacao-fisioterapeutas`
-- [ ] 5.5 Implementar comandos da fisio (agenda, indisponibilidade, repasse) com toolset restrito; verificar por teste que o toolset não acessa dados de outras famílias
+- [ ] 5.5 Implementar contraproposta da fisio (texto livre → `propor_alternativa`, validação na agenda, encaminhamento à família, descarte quando outra aceita o original) e perguntas sobre a oferta; verificar pelos cenários de contraproposta da spec `coordenacao-fisioterapeutas`
+- [ ] 5.6 Implementar comandos da fisio (agenda, indisponibilidade, repasse) com toolset restrito; verificar por teste que o toolset não acessa dados de outras famílias
 
 ## 6. Conversa com responsáveis
 
@@ -53,7 +54,7 @@
 ## 7. Privacidade (LGPD)
 
 - [ ] 7.1 Implementar registro de consentimento com versão do aviso e verificar que sem consentimento nenhum dado da criança é gravado
-- [ ] 7.2 Implementar minimização nas ofertas e no evento do Outlook; verificar por teste que oferta não aceita não contém nome nem endereço completo
+- [ ] 7.2 Implementar minimização nas ofertas e no evento do Outlook; verificar por teste que a oferta contém nome, idade e endereço mas não telefone do responsável nem dados clínicos
 - [ ] 7.3 Implementar retenção (expurgo de conversas em 90 dias) e fluxo de pedido de exclusão/acesso; verificar por teste do job de expurgo
 - [ ] 7.4 Implementar log de acesso humano a dados de pacientes e verificar registro por teste
 - [ ] 7.5 Redigir aviso de privacidade e lista de operadores/transferências internacionais em `docs/privacidade.md` para revisão jurídica
