@@ -236,7 +236,7 @@ Projeto novo, sem migração de dados. Implantação em etapas: (1) sandbox do W
 As respostas abaixo ajustam parâmetros e detalhes; onde não houver resposta, vale a suposição indicada.
 
 1. ~~**Agenda:** uma conta da clínica ou uma por fisio?~~ **Respondido:** cada fisio tem conta própria, com e-mail pessoal. Também pode haver fisio com Gmail, então o sistema suporta Outlook e Google Agenda (D4).
-2. **Como as fisios informam disponibilidade hoje?** Suposição: blocos `Disponível` no Outlook. Alternativa: grade semanal no sistema.
+2. ~~**Como as fisios informam disponibilidade?**~~ **Respondido:** a fisio cria blocos `Disponível` na agenda dedicada (Outlook ou Google), como descrito em D4.
 3. **Aceite da fisio:** toda marcação precisa de aceite (suposição) ou algumas fisios aceitam automaticamente?
 4. **Raio de 10 km:** contar a partir da residência e também do atendimento anterior do dia (suposição) ou só da residência? Distância de rota (suposição) ou em linha reta?
 5. **Equilíbrio:** medir por horas agendadas sobre disponíveis em 2 semanas (suposição) ou por número de pacientes ativos?
