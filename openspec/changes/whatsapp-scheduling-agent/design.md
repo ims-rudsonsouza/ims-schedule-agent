@@ -145,7 +145,7 @@ Oferta aberta em suspensão: ENVIADA -> SUSPENSA (rodada com a família) -> resp
 Fila da oferta aberta: [aceites do horário original no topo] + [propostas por ordem de chegada]; reordenada quando a família sugere um horário
 ```
 
-- **Sequencial** (grupo no raio): uma oferta por vez, prazo padrão 20 min (8 min para pedidos do mesmo dia, 5 min para início em menos de 2 h). Recusa pelo botão ou expiração **não** dispara a próxima automaticamente: o pedido vai para `AGUARDANDO_FAMILIA` e a próxima candidata só recebe a oferta depois do "sim" da família.
+- **Sequencial** (grupo no raio): uma oferta por vez, prazo de 20 min em horário comercial (8h–18h) e de 10 h fora dele (madrugada), sempre limitado pela folga até o atendimento: 8 min para pedidos do mesmo dia e 5 min para início em menos de 2 h. Recusa pelo botão ou expiração **não** dispara a próxima automaticamente: o pedido vai para `AGUARDANDO_FAMILIA` e a próxima candidata só recebe a oferta depois do "sim" da família.
 - **Aberta** (fora do raio): todas ao mesmo tempo, prazo padrão 30 min. Recusas individuais não voltam à família; ela só é consultada se todas recusarem ou o prazo acabar sem aceite.
 - **Concorrência:** o aceite executa uma transação que (1) trava a linha do pedido (`SELECT ... FOR UPDATE`), (2) verifica que o pedido ainda está `AGUARDANDO_FISIO`, (3) reconsulta o Outlook daquele intervalo, (4) cria o evento, (5) marca `CONFIRMADO` e as demais ofertas `PREENCHIDA`. Restrição de exclusão no Postgres (`EXCLUDE USING gist` em fisio + intervalo) impede dois agendamentos sobrepostos para a mesma fisio mesmo com bug de aplicação.
 - Enquanto aguarda aceite, o horário fica **pré-reservado** no banco (não no Outlook), para não oferecer o mesmo horário a outra família.
@@ -259,8 +259,8 @@ As respostas abaixo ajustam parâmetros e detalhes; onde não houver resposta, v
 7. ~~**Raio de 10 km**~~ **Respondido:** distância por rota. Ainda vale a suposição de origem: residência ou atendimento anterior do dia.
 8. ~~**Equilíbrio**~~ **Respondido:** número de atendimentos (1 h cada) sobre horas disponíveis (D2).
 9. ~~**Oferta aberta e negociação**~~ **Respondido:** propostas viram rodadas para a família, as demais ofertas ficam suspensas com as respostas em fila, e respostas compatíveis com a sugestão da família têm prioridade (D3).
-10. **Prazo da negociação:** 2 horas ou 3 rodadas sem acordo é razoável?
-11. **Prazo de resposta das fisios:** 20 min é aceitável? E de madrugada, ofertas ficam para a manhã?
+10. ~~**Prazo da negociação**~~ **Respondido:** 2 horas ou 3 rodadas sem acordo.
+11. ~~**Prazo de resposta das fisios**~~ **Respondido:** 20 min em horário comercial e 10 h de madrugada, limitado pela antecedência do atendimento. Pendente: confirmar a faixa do horário comercial (suposição: 8h–18h, todos os dias).
 12. ~~**Duração**~~ **Respondido:** o atendimento conta 1 h no registro, e a agenda reserva mais 10 min de relatório, além do deslocamento.
 13. **Nome da fisio nas opções:** mostrar o nome da fisio nas opções à família (suposição) ou só após o aceite?
 14. **Equipe humana:** quem recebe as transferências e em que horário? Existe um número atual da secretária que será migrado?

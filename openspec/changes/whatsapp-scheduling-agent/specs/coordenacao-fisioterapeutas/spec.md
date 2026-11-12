@@ -18,15 +18,26 @@ O sistema SHALL enviar à fisioterapeuta uma oferta com data, horário, nome e i
 - **THEN** o agendamento é confirmado, o evento é criado na agenda dela e ela recebe o telefone do responsável
 
 ### Requirement: Prazo de resposta
-Cada oferta individual SHALL ter prazo de resposta configurável (padrão 20 minutos). Para atendimentos que começam em poucas horas, o prazo SHALL ser reduzido para que, somado ao deslocamento, a resposta chegue antes da hora de sair (padrão 8 minutos no mesmo dia e 5 minutos para início em menos de 2 horas). O estouro do prazo SHALL ser tratado como recusa pelo botão.
-
-#### Scenario: Oferta para daqui a 1h30
-- **WHEN** às 10h uma oferta é enviada para um atendimento às 11h30
-- **THEN** a fisio tem 5 minutos para responder
+Cada oferta individual SHALL ter prazo de resposta configurável: 20 minutos quando enviada em horário comercial (padrão 8h–18h) e 10 horas quando enviada fora dele (madrugada). O estouro do prazo SHALL ser tratado como recusa pelo botão.
 
 #### Scenario: Prazo esgotado
 - **WHEN** o prazo termina sem resposta da fisio
 - **THEN** a oferta expira, a fisio é avisada de que expirou e a família é consultada como em uma recusa
+
+#### Scenario: Oferta enviada de madrugada
+- **WHEN** às 23h a família pede atendimento para depois de amanhã às 14h
+- **THEN** a fisio tem até 9h do dia seguinte para responder e a família é avisada de que a confirmação sai pela manhã
+
+### Requirement: Prazo limitado pela hora do atendimento
+O prazo de resposta MUST NOT passar do limite em que a fisio ainda consegue responder e chegar ao atendimento. Para atendimentos próximos, o prazo SHALL ser reduzido (padrão 8 minutos no mesmo dia e 5 minutos para início em menos de 2 horas).
+
+#### Scenario: Oferta de madrugada para atendimento cedo
+- **WHEN** às 2h a família pede atendimento para as 8h do mesmo dia
+- **THEN** o prazo é encurtado pela regra de antecedência e deslocamento, em vez de esperar 10 horas
+
+#### Scenario: Oferta para daqui a 1h30
+- **WHEN** às 10h uma oferta é enviada para um atendimento às 11h30
+- **THEN** a fisio tem 5 minutos para responder
 
 ### Requirement: Botão Recusar volta à família
 Quando a fisio tocar em "Recusar" na oferta de um horário escolhido pela família, o sistema MUST NOT ofertar o pedido a outra fisio automaticamente, seja a fisio pedida pela família ou não. O agente SHALL informar à família que a fisio não tem disponibilidade e perguntar se pode verificar com outra fisio; só com o "sim" da família o sistema SHALL buscar outra.
