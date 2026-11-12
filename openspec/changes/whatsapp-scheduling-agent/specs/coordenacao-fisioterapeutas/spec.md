@@ -99,12 +99,16 @@ A negociação SHALL terminar sem acordo quando a família ou a fisio desistir, 
 - **WHEN** a negociação fica 2 horas sem acordo
 - **THEN** ela é encerrada sem acordo, as duas partes são avisadas e a família é consultada sobre outra fisio
 
-### Requirement: Aceite automático opcional
-Uma fisioterapeuta SHALL poder ser configurada com aceite automático; nesse caso o sistema MUST confirmar sem esperar resposta e apenas notificá-la do novo agendamento.
+### Requirement: Aceite obrigatório da fisioterapeuta
+Todo atendimento oferecido pelo sistema MUST ser aceito pela fisioterapeuta antes da confirmação à família, seja pelo botão "Aceitar" ou concordando com um horário na negociação. O sistema MUST NOT confirmar um atendimento só porque o horário está livre na agenda. Sessões que a própria fisio registra pela conversa contam como aceitas por ela.
 
-#### Scenario: Fisio com aceite automático
-- **WHEN** a alocação escolhe uma fisio com aceite automático
-- **THEN** o agendamento é confirmado imediatamente e ela recebe a notificação com os dados completos
+#### Scenario: Horário livre sem resposta da fisio
+- **WHEN** a fisio tem o horário livre na agenda mas ainda não respondeu à oferta
+- **THEN** a família continua com o status "confirmando com a fisio" e nada é gravado como confirmado
+
+#### Scenario: Sessão registrada pela própria fisio
+- **WHEN** a fisio escreve "marquei a próxima da Maria quinta 10h"
+- **THEN** o atendimento é confirmado sem nova oferta a ela
 
 ### Requirement: Notificações de mudanças
 O sistema SHALL notificar a fisioterapeuta por WhatsApp sobre cancelamentos e remarcações dos seus atendimentos, e SHALL enviar um resumo da agenda do dia seguinte em horário configurável.

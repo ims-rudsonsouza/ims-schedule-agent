@@ -44,7 +44,7 @@
 - [ ] 5.1 Implementar máquinas de estado de Pedido e Oferta e verificar transições inválidas rejeitadas por teste
 - [ ] 5.2 Implementar ofertas sequenciais com prazo e expiração (tratada como recusa) e retomada só após o "sim" da família; verificar com relógio simulado
 - [ ] 5.3 Implementar oferta aberta com primeiro aceite vencedor e aviso de "preenchido"; verificar com teste de aceites concorrentes
-- [ ] 5.4 Implementar aceite automático, notificações de mudança e resumo diário; verificar pelos cenários da spec `coordenacao-fisioterapeutas`
+- [ ] 5.4 Implementar a regra de aceite obrigatório, notificações de mudança e resumo diário; verificar pelos cenários da spec `coordenacao-fisioterapeutas`
 - [ ] 5.5 Implementar negociação exclusiva (texto livre → `propor_alternativa`, validação na agenda, intermediação família↔fisio, trava do pedido, suspensão de ofertas abertas, prazo e fallback) e perguntas sobre a oferta; verificar pelos cenários de negociação da spec `coordenacao-fisioterapeutas`
 - [ ] 5.6 Implementar a regra do botão Recusar (recusa/expiração volta à família, busca de outra fisio só com o "sim" dela; texto com outro dia/horário abre negociação; negativa ambígua pede esclarecimento); verificar pelos cenários do requisito "Botão Recusar volta à família"
 - [ ] 5.7 Implementar comandos da fisio (agenda, indisponibilidade) com toolset restrito; verificar por teste que o toolset não acessa dados de outras famílias

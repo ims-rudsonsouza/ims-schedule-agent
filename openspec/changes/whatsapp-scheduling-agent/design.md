@@ -68,9 +68,8 @@ Restrições: um desenvolvedor, ~2 meses até o piloto, 10 fisios hoje, dados de
 4. Necessidade: quando? (hoje / amanhã / dias e turnos) e preferência de fisio
    - checagem determinística de sinais de gravidade em toda mensagem -> orientação de emergência + humano
 5. buscar_opcoes -> o agente apresenta 2-3 opções reais ("1) Ter 14h com Ana  2) Ter 16h com Bia ...")
-6. Família escolhe -> solicitar_agendamento
-   a. fisio com aceite automático -> confirmado na hora
-   b. caso normal -> "Vou confirmar com a Ana e já te aviso" -> oferta à fisio (D3)
+6. Família escolhe -> solicitar_agendamento -> "Vou confirmar com a Ana e já te aviso" -> oferta à fisio (D3)
+   (sempre com aceite da fisio; não há confirmação automática)
 7. Confirmado -> resumo + .ics + lembrete de véspera agendado
    Sem aceite -> desculpas + novas opções ou humano
 ```
@@ -201,7 +200,7 @@ Oferta aberta em suspensão: ENVIADA -> SUSPENSA (outra fisio negociando) -> ENV
 | Responsavel | id, telefone, nome, consentimento_em, versao_aviso |
 | Crianca | id, responsavel_id, nome, data_nascimento, fisio_continuidade_id |
 | Endereco | id, responsavel_id, texto, complemento, geom (PostGIS) |
-| Fisioterapeuta | id, nome, telefone, residencia_geom, provedor_agenda, agenda_dedicada_id, token_ref (segredo criptografado), conexao_status, aceite_automatico, ativa |
+| Fisioterapeuta | id, nome, telefone, residencia_geom, provedor_agenda, agenda_dedicada_id, token_ref (segredo criptografado), conexao_status, ativa |
 | Pedido | id, crianca_id, endereco_id, janela, preferencia_fisio_id, estado, urgente |
 | Oferta | id, pedido_id, fisio_id, inicio, fim, modo (sequencial/aberta), estado, expira_em |
 | Agendamento | id, pedido_id, fisio_id, intervalo (tstzrange), outlook_event_id, estado |
@@ -223,7 +222,7 @@ Mantida a do design anterior: AWS sa-east-1, FastAPI em App Runner/Fargate, RDS 
 
 ## Risks / Trade-offs
 
-- [Fisios não respondem rápido às ofertas] → prazos curtos, aceite automático opcional, ondas paralelas configuráveis e alerta para a equipe humana.
+- [Fisios não respondem rápido às ofertas] → prazos curtos, lembrete de oferta pendente na metade do prazo, ondas paralelas configuráveis e alerta para a equipe humana (não há aceite automático, por decisão do Rudson).
 - [Verificação do app no Google atrasa o piloto ou tokens expiram em 7 dias no modo Teste] → iniciar a verificação na fase de fundação; no piloto interno, usar contas Outlook ou aceitar a reconexão semanal.
 - [Fisio revoga o acesso ou o token expira] → status de conexão monitorado, fisio sai das ofertas até reconectar, aviso com link para ela e para a equipe.
 - [Agenda no Outlook fica desatualizada ou é usada de forma inconsistente] → convenção simples (categoria `Disponível`), resumo diário pelo WhatsApp para a fisio conferir, sincronização por notificação + delta.
@@ -250,7 +249,7 @@ As respostas abaixo ajustam parâmetros e detalhes; onde não houver resposta, v
 2. ~~**Como as fisios informam disponibilidade?**~~ **Respondido:** a fisio cria blocos `Disponível` na agenda dedicada (Outlook ou Google), como descrito em D4.
 3. ~~**Pacotes e recorrência**~~ **Respondido:** pelo WhatsApp chega o primeiro contato, uma sessão por vez. As seguintes são combinadas pessoalmente entre família e fisio e registradas por ela (D3); em caso de divergência, a própria fisio repassa o atendimento a uma colega.
 4. ~~**Urgência**~~ **Respondido:** há atendimento no mesmo dia, em fins de semana e feriados; antecedência mínima de 1 hora (D2).
-5. **Aceite da fisio:** toda marcação precisa de aceite (suposição) ou algumas fisios aceitam automaticamente?
+5. ~~**Aceite da fisio**~~ **Respondido:** a fisio sempre precisa aceitar; não há aceite automático.
 6. **Número de WhatsApp:** número novo ou o atual da clínica? A empresa já tem Meta Business verificada?
 7. **Raio de 10 km:** contar a partir da residência e também do atendimento anterior do dia (suposição) ou só da residência? Distância de rota (suposição) ou em linha reta?
 8. **Equilíbrio:** medir por horas agendadas sobre disponíveis em 2 semanas (suposição) ou por número de pacientes ativos?

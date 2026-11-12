@@ -40,7 +40,7 @@ O agente SHALL oferecer de duas a três opções de horário reais, já verifica
 - **THEN** o agente informa isso e sugere os horários mais próximos fora da janela ou pergunta por outra janela
 
 ### Requirement: Confirmação pendente com a fisioterapeuta
-Quando a alocação exigir aceite da fisioterapeuta, o agente SHALL informar ao responsável que está confirmando com a fisio e SHALL avisá-lo assim que houver aceite, recusa, estouro de prazo ou proposta de outro horário pela fisio.
+Como todo atendimento exige aceite da fisioterapeuta, o agente SHALL informar ao responsável que está confirmando com a fisio e SHALL avisá-lo assim que houver aceite, recusa, estouro de prazo ou proposta de outro horário pela fisio.
 
 #### Scenario: Aceite recebido
 - **WHEN** a fisio aceita a oferta
