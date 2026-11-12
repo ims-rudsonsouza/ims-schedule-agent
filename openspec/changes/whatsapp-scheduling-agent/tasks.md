@@ -33,10 +33,11 @@
 
 - [ ] 4.1 Implementar geocodificação e matriz de rotas com cache por geohash; verificar por teste que pares repetidos não chamam a API
 - [ ] 4.2 Implementar janelas candidatas com deslocamento e margem (D2 passo 1); verificar o cenário "deslocamento não cabe"
-- [ ] 4.3 Implementar preferência e continuidade (passo 2); verificar os cenários da spec `alocacao-fisioterapeuta`
-- [ ] 4.4 Implementar raio de 10 km com origem efetiva, pontuação por inserção + ocupação e trava de justiça (passos 3–4); verificar os cenários de empate e diferença de distância
-- [ ] 4.5 Implementar decisão de oferta aberta (passo 5) e o registro `DecisaoAlocacao`; verificar por teste
-- [ ] 4.6 Criar simulador com as 10 fisios e 200 pedidos sintéticos que reporte distribuição de ocupação e km por fisio; verificar que nenhuma fisio fica >25 pp acima da média com os pesos padrão
+- [ ] 4.3 Implementar antecedência mínima (1 h), folga para resposta + deslocamento e marcação de pedidos urgentes; verificar pelos cenários do requisito "Antecedência mínima e atendimento todos os dias"
+- [ ] 4.4 Implementar preferência e continuidade (passo 2); verificar os cenários da spec `alocacao-fisioterapeuta`
+- [ ] 4.5 Implementar raio de 10 km com origem efetiva, pontuação por inserção + ocupação e trava de justiça (passos 3–4); verificar os cenários de empate e diferença de distância
+- [ ] 4.6 Implementar decisão de oferta aberta (passo 5) e o registro `DecisaoAlocacao`; verificar por teste
+- [ ] 4.7 Criar simulador com as 10 fisios e 200 pedidos sintéticos que reporte distribuição de ocupação e km por fisio; verificar que nenhuma fisio fica >25 pp acima da média com os pesos padrão
 
 ## 5. Coordenação com fisioterapeutas
 

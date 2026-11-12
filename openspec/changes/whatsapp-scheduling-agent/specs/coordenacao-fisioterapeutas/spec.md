@@ -18,7 +18,11 @@ O sistema SHALL enviar à fisioterapeuta uma oferta com data, horário, nome e i
 - **THEN** o agendamento é confirmado, o evento é criado na agenda dela e ela recebe o telefone do responsável
 
 ### Requirement: Prazo de resposta
-Cada oferta individual SHALL ter prazo de resposta configurável (padrão 20 minutos; menor para pedidos no mesmo dia). O estouro do prazo SHALL ser tratado como recusa pelo botão.
+Cada oferta individual SHALL ter prazo de resposta configurável (padrão 20 minutos). Para atendimentos que começam em poucas horas, o prazo SHALL ser reduzido para que, somado ao deslocamento, a resposta chegue antes da hora de sair (padrão 8 minutos no mesmo dia e 5 minutos para início em menos de 2 horas). O estouro do prazo SHALL ser tratado como recusa pelo botão.
+
+#### Scenario: Oferta para daqui a 1h30
+- **WHEN** às 10h uma oferta é enviada para um atendimento às 11h30
+- **THEN** a fisio tem 5 minutos para responder
 
 #### Scenario: Prazo esgotado
 - **WHEN** o prazo termina sem resposta da fisio

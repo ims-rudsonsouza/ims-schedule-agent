@@ -13,6 +13,21 @@ Uma fisioterapeuta SHALL ser elegível para um horário somente se o intervalo c
 - **WHEN** a fisio tem disponibilidade às 14h mas termina outro atendimento às 13h50 a 25 minutos de distância
 - **THEN** ela não é elegível para 14h
 
+### Requirement: Antecedência mínima e atendimento todos os dias
+O sistema SHALL oferecer horários em qualquer dia da semana, inclusive fins de semana e feriados, sempre que houver bloco `Disponível`, e MUST NOT oferecer horário que comece em menos de 1 hora (antecedência mínima configurável). Para o mesmo dia, o horário SHALL deixar tempo para a fisio responder à oferta e se deslocar.
+
+#### Scenario: Pedido para daqui a 40 minutos
+- **WHEN** às 10h a família pede atendimento para 10h40
+- **THEN** o agente explica que precisa de pelo menos 1 hora e oferece os primeiros horários a partir das 11h
+
+#### Scenario: Feriado
+- **WHEN** a família pede atendimento num feriado e uma fisio tem bloco `Disponível` nesse dia
+- **THEN** o horário é oferecido normalmente
+
+#### Scenario: Deslocamento maior que a folga
+- **WHEN** às 10h a única fisio livre às 11h05 está a 50 minutos do endereço
+- **THEN** 11h05 não é oferecido com ela, porque não sobra tempo para a resposta e o deslocamento
+
 ### Requirement: Preferência da família
 Quando a família indicar uma fisioterapeuta preferida, o sistema SHALL ofertar primeiro os horários dessa fisio, independentemente de distância e carga. Se ela não tiver horário na janela pedida, o sistema SHALL perguntar se a família prefere outro horário com ela ou outra fisio. Outra fisio só SHALL ser considerada com a concordância da família.
 

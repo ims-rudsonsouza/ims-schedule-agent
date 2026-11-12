@@ -92,6 +92,15 @@ início + duração_sessão + margem_relatório + desloc(novo -> S) <= início(S
 
 Padrões: sessão 60 min, margem 10 min (configuráveis por tipo de serviço).
 
+**Antecedência e dias:** todos os dias da semana, inclusive fins de semana e feriados, valem desde que haja bloco `Disponível`; não há calendário de feriados no motor. Para cada candidato, o início precisa respeitar:
+
+```
+início >= agora + 1 h                                         (antecedência mínima, configurável)
+início >= agora + prazo_da_oferta + desloc(origem_atual -> novo) (tempo para responder e chegar)
+```
+
+A `origem_atual` é o atendimento em andamento ou anterior no dia, ou a residência. Pedidos com início em menos de 3 h são marcados `urgente`. Para eles, se não houver ninguém no raio, a oferta aberta sai na hora, e a família recebe o aviso "estou confirmando, te respondo em até X minutos". Na negociação de um pedido urgente, o prazo total é limitado pela mesma conta.
+
 **Passo 2 — Preferência.** Se há fisio preferida (escolhida pela família ou "fisio de continuidade" das últimas sessões), retornar só as janelas dela. Sem janela na faixa pedida: retornar as próximas janelas dela + até 2 alternativas de outras fisios, marcadas como tal.
 
 **Passo 3 — Raio de 10 km.** `dist_origem` = distância de rota entre a origem efetiva (P, ou residência se não houver P) e o endereço. Fisios com `dist_origem <= 10 km` formam o grupo **no raio**.
@@ -134,7 +143,7 @@ Negociação: ABERTA -> ACORDO | SEM_ACORDO (desistência, 3 rodadas ou 2 h)
 Oferta aberta em suspensão: ENVIADA -> SUSPENSA (outra fisio negociando) -> ENVIADA | PREENCHIDA
 ```
 
-- **Sequencial** (grupo no raio): uma oferta por vez, prazo padrão 20 min (8 min para pedidos do mesmo dia). Recusa pelo botão ou expiração **não** dispara a próxima automaticamente: o pedido vai para `AGUARDANDO_FAMILIA` e a próxima candidata só recebe a oferta depois do "sim" da família.
+- **Sequencial** (grupo no raio): uma oferta por vez, prazo padrão 20 min (8 min para pedidos do mesmo dia, 5 min para início em menos de 2 h). Recusa pelo botão ou expiração **não** dispara a próxima automaticamente: o pedido vai para `AGUARDANDO_FAMILIA` e a próxima candidata só recebe a oferta depois do "sim" da família.
 - **Aberta** (fora do raio): todas ao mesmo tempo, prazo padrão 30 min. Recusas individuais não voltam à família; ela só é consultada se todas recusarem ou o prazo acabar sem aceite.
 - **Concorrência:** o aceite executa uma transação que (1) trava a linha do pedido (`SELECT ... FOR UPDATE`), (2) verifica que o pedido ainda está `AGUARDANDO_FISIO`, (3) reconsulta o Outlook daquele intervalo, (4) cria o evento, (5) marca `CONFIRMADO` e as demais ofertas `PREENCHIDA`. Restrição de exclusão no Postgres (`EXCLUDE USING gist` em fisio + intervalo) impede dois agendamentos sobrepostos para a mesma fisio mesmo com bug de aplicação.
 - Enquanto aguarda aceite, o horário fica **pré-reservado** no banco (não no Outlook), para não oferecer o mesmo horário a outra família.
@@ -240,7 +249,7 @@ As respostas abaixo ajustam parâmetros e detalhes; onde não houver resposta, v
 1. ~~**Agenda:** uma conta da clínica ou uma por fisio?~~ **Respondido:** cada fisio tem conta própria, com e-mail pessoal. Também pode haver fisio com Gmail, então o sistema suporta Outlook e Google Agenda (D4).
 2. ~~**Como as fisios informam disponibilidade?**~~ **Respondido:** a fisio cria blocos `Disponível` na agenda dedicada (Outlook ou Google), como descrito em D4.
 3. ~~**Pacotes e recorrência**~~ **Respondido:** pelo WhatsApp chega o primeiro contato, uma sessão por vez. As seguintes são combinadas pessoalmente entre família e fisio e registradas por ela (D3); em caso de divergência, a própria fisio repassa o atendimento a uma colega.
-4. **Urgência:** há atendimento no mesmo dia, fins de semana e feriados? Qual antecedência mínima?
+4. ~~**Urgência**~~ **Respondido:** há atendimento no mesmo dia, em fins de semana e feriados; antecedência mínima de 1 hora (D2).
 5. **Aceite da fisio:** toda marcação precisa de aceite (suposição) ou algumas fisios aceitam automaticamente?
 6. **Número de WhatsApp:** número novo ou o atual da clínica? A empresa já tem Meta Business verificada?
 7. **Raio de 10 km:** contar a partir da residência e também do atendimento anterior do dia (suposição) ou só da residência? Distância de rota (suposição) ou em linha reta?
