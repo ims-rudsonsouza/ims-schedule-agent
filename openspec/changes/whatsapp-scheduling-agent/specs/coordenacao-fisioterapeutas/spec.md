@@ -48,11 +48,34 @@ Quando a fisio tocar em "Recusar" na oferta de um horário escolhido pela famíl
 - **THEN** o agente trata a mensagem como proposta de outro dia/horário e inicia uma negociação, sem consultar a família sobre outra fisio
 
 ### Requirement: Oferta aberta com primeira resposta vencedora
-Na oferta aberta (sem fisio a até 10 km), o sistema SHALL enviar a oferta simultaneamente a todas as fisios elegíveis, e SHALL atribuir o atendimento à primeira que aceitar. As demais SHALL ser avisadas de que o horário foi preenchido. A família SHALL ser consultada somente quando todas recusarem ou o prazo acabar sem aceite.
+Na oferta aberta (sem fisio a até 10 km), o sistema SHALL enviar a oferta simultaneamente a todas as fisios elegíveis, e SHALL atribuir o atendimento à primeira que aceitar enquanto nenhuma rodada de propostas estiver com a família. As demais SHALL ser avisadas de que o horário foi preenchido. A família SHALL ser consultada somente quando todas recusarem ou o prazo acabar sem aceite.
 
 #### Scenario: Duas fisios aceitam quase ao mesmo tempo
 - **WHEN** duas fisios aceitam a mesma oferta aberta com segundos de diferença
 - **THEN** apenas o primeiro aceite registrado é confirmado e a segunda recebe "esse horário já foi preenchido, obrigado!"
+
+### Requirement: Fila de respostas na oferta aberta
+Na oferta aberta, quando uma fisio propuser um ou mais horários, o sistema SHALL enviar essas opções à família como uma rodada e suspender as demais ofertas. Respostas que chegarem durante a suspensão SHALL entrar numa fila, sem serem descartadas. Se a família recusar a rodada, o sistema SHALL apresentar a próxima resposta da fila. Se a família recusar e sugerir um horário, uma resposta da fila compatível com essa sugestão SHALL ter prioridade sobre a ordem da fila.
+
+#### Scenario: Fisio propõe dois horários
+- **WHEN** numa oferta aberta para terça 14h a Carla responde "posso terça 16h ou quarta 9h"
+- **THEN** a família recebe as duas opções da Carla e as ofertas às outras fisios ficam suspensas
+
+#### Scenario: Família recusa a rodada
+- **WHEN** a família recusa as opções da Carla e na fila há uma proposta da Dani para quarta 15h
+- **THEN** a família recebe a opção da Dani e a Carla é avisada de que a família não aceitou
+
+#### Scenario: Família sugere horário que está na fila
+- **WHEN** a família recusa as opções da Carla e diz "quinta de manhã seria melhor", e na fila há a Dani com quarta 15h e depois a Edu com quinta 9h
+- **THEN** a opção da Edu (quinta 9h) é apresentada primeiro, por ser compatível com o pedido da família
+
+#### Scenario: Aceite do horário original durante a suspensão
+- **WHEN** enquanto a família avalia as opções da Carla a Dani toca em "Aceitar" o horário original
+- **THEN** o aceite da Dani entra no topo da fila e é apresentado à família logo depois da rodada atual, se a família não aceitar as opções da Carla
+
+#### Scenario: Fila vazia
+- **WHEN** a família recusa a rodada e não há mais respostas na fila
+- **THEN** as ofertas suspensas voltam a valer até o prazo, e a família é consultada sobre outros horários se ninguém mais responder
 
 ### Requirement: Contraproposta da fisioterapeuta
 Além dos botões, a fisioterapeuta SHALL poder responder à oferta por texto livre. Quando o texto indicar a intenção de outro dia ou horário, o sistema SHALL tratá-lo como proposta (e não como recusa), interpretar a sugestão, verificar se cabe na agenda dela (com deslocamento) e, se couber, abrir uma negociação com a família; se não couber, SHALL explicar o conflito e pedir outra sugestão.
@@ -82,7 +105,7 @@ Uma contraproposta SHALL abrir uma negociação entre a família e aquela fisio,
 
 #### Scenario: Negociação durante oferta aberta
 - **WHEN** numa oferta aberta a Carla sugere outro horário antes de qualquer aceite
-- **THEN** as ofertas abertas às demais fisios são suspensas e elas são avisadas de que o horário está em negociação
+- **THEN** as ofertas abertas às demais fisios são suspensas e as opções da Carla seguem para a família, conforme o requisito de fila da oferta aberta
 
 ### Requirement: Fim da negociação sem acordo
 A negociação SHALL terminar sem acordo quando a família ou a fisio desistir, ou quando passar o prazo máximo (padrão 2 horas, ou 3 rodadas sem acordo). Ao terminar sem acordo, o sistema SHALL avisar a fisio e perguntar à família se pode verificar com outra fisio, inclusive quando a família tiver pedido aquela fisio; só com o "sim" da família o sistema SHALL buscar outra.
