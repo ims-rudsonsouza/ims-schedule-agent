@@ -7,33 +7,93 @@ Coordenar com as fisioterapeutas, pelo mesmo número de WhatsApp usado com as fa
 ## ADDED Requirements
 
 ### Requirement: Oferta de atendimento para a fisioterapeuta
-O sistema SHALL enviar à fisioterapeuta uma oferta com data, horário, bairro, distância/tempo estimado de deslocamento e idade da criança, com opções "Aceitar" e "Recusar". O endereço completo e o nome da criança MUST ser enviados somente após o aceite.
+O sistema SHALL enviar à fisioterapeuta uma oferta com data, horário, nome e idade da criança, endereço completo e distância/tempo estimado de deslocamento, com as opções "Aceitar" e "Recusar" e a possibilidade de responder por texto. O telefone do responsável SHALL ser enviado somente após a confirmação.
 
 #### Scenario: Oferta enviada
 - **WHEN** a alocação escolhe uma fisio para um pedido
-- **THEN** ela recebe a oferta com botões de resposta rápida e sem o endereço completo
+- **THEN** ela recebe a oferta com nome da criança, endereço completo e botões de resposta rápida
 
 #### Scenario: Aceite
 - **WHEN** a fisio toca em "Aceitar" dentro do prazo e o horário ainda está livre
-- **THEN** o agendamento é confirmado, o evento é criado na agenda dela e ela recebe o endereço completo e o nome da criança
+- **THEN** o agendamento é confirmado, o evento é criado na agenda dela e ela recebe o telefone do responsável
 
-### Requirement: Prazo de resposta e próxima candidata
-Cada oferta individual SHALL ter prazo de resposta configurável (padrão 20 minutos; menor para pedidos no mesmo dia). Em caso de recusa ou estouro de prazo, o sistema SHALL ofertar à próxima candidata do ranking.
-
-#### Scenario: Recusa
-- **WHEN** a fisio recusa a oferta
-- **THEN** a oferta é encerrada e a próxima fisio do ranking recebe a oferta
+### Requirement: Prazo de resposta
+Cada oferta individual SHALL ter prazo de resposta configurável (padrão 20 minutos; menor para pedidos no mesmo dia). O estouro do prazo SHALL ser tratado como recusa pelo botão.
 
 #### Scenario: Prazo esgotado
-- **WHEN** o prazo termina sem resposta
-- **THEN** a oferta expira, a fisio é avisada de que expirou e a próxima candidata recebe a oferta
+- **WHEN** o prazo termina sem resposta da fisio
+- **THEN** a oferta expira, a fisio é avisada de que expirou e a família é consultada como em uma recusa
+
+### Requirement: Botão Recusar volta à família
+Quando a fisio tocar em "Recusar" na oferta de um horário escolhido pela família, o sistema MUST NOT ofertar o pedido a outra fisio automaticamente, seja a fisio pedida pela família ou não. O agente SHALL informar à família que a fisio não tem disponibilidade e perguntar se pode verificar com outra fisio; só com o "sim" da família o sistema SHALL buscar outra.
+
+#### Scenario: Fisio toca em Recusar
+- **WHEN** a família escolheu "terça 14h com a Bia" e a Bia toca em "Recusar"
+- **THEN** a família recebe "A Bia não tem disponibilidade nesse horário. Posso verificar com outra fisioterapeuta?" e nenhuma outra fisio é acionada antes da resposta
+
+#### Scenario: Família autoriza outra fisio
+- **WHEN** a família responde que pode ser outra fisio
+- **THEN** o sistema roda a alocação (raio, deslocamento, carga) sem a fisio que recusou e oferta o horário à próxima candidata
+
+#### Scenario: Família prefere a mesma fisio
+- **WHEN** a família responde que quer continuar com a Bia
+- **THEN** o agente oferece os próximos horários livres da Bia
+
+#### Scenario: Fisio responde por texto em vez do botão
+- **WHEN** a fisio não toca em nenhum botão e escreve "esse dia não, mas quinta de manhã eu consigo"
+- **THEN** o agente trata a mensagem como proposta de outro dia/horário e inicia uma negociação, sem consultar a família sobre outra fisio
 
 ### Requirement: Oferta aberta com primeira resposta vencedora
-Na oferta aberta (sem fisio a até 10 km), o sistema SHALL enviar a oferta simultaneamente a todas as fisios elegíveis, e SHALL atribuir o atendimento à primeira que aceitar. As demais SHALL ser avisadas de que o horário foi preenchido.
+Na oferta aberta (sem fisio a até 10 km), o sistema SHALL enviar a oferta simultaneamente a todas as fisios elegíveis, e SHALL atribuir o atendimento à primeira que aceitar. As demais SHALL ser avisadas de que o horário foi preenchido. A família SHALL ser consultada somente quando todas recusarem ou o prazo acabar sem aceite.
 
 #### Scenario: Duas fisios aceitam quase ao mesmo tempo
 - **WHEN** duas fisios aceitam a mesma oferta aberta com segundos de diferença
 - **THEN** apenas o primeiro aceite registrado é confirmado e a segunda recebe "esse horário já foi preenchido, obrigado!"
+
+### Requirement: Contraproposta da fisioterapeuta
+Além dos botões, a fisioterapeuta SHALL poder responder à oferta por texto livre. Quando o texto indicar a intenção de outro dia ou horário, o sistema SHALL tratá-lo como proposta (e não como recusa), interpretar a sugestão, verificar se cabe na agenda dela (com deslocamento) e, se couber, abrir uma negociação com a família; se não couber, SHALL explicar o conflito e pedir outra sugestão.
+
+#### Scenario: Fisio sugere outro horário
+- **WHEN** a fisio responde à oferta de terça 14h com "terça não dá, consigo quarta às 10h"
+- **THEN** o sistema confirma com ela "quarta 10h, certo? Vou consultar a família", verifica a agenda e abre a negociação
+
+#### Scenario: Sugestão conflita com a agenda dela
+- **WHEN** a fisio sugere quarta 10h mas já tem atendimento às 9h30 do outro lado da cidade
+- **THEN** o agente explica que o horário não cabe com o deslocamento e pergunta se ela tem outra opção
+
+#### Scenario: Pergunta antes de decidir
+- **WHEN** a fisio pergunta "a criança mora em casa ou apartamento?" antes de responder
+- **THEN** o agente responde com a informação do cadastro, ou diz que não tem e oferece perguntar à família, sem encerrar a oferta
+
+### Requirement: Negociação exclusiva de dia e horário
+Uma contraproposta SHALL abrir uma negociação entre a família e aquela fisio, com o agente intermediando as mensagens, seja a fisio pedida pela família ou não. Durante a negociação, o pedido MUST NOT ser ofertado a nenhuma outra fisio. Um horário só é confirmado quando família e fisio concordam com ele e a agenda é reverificada.
+
+#### Scenario: Negociação até um acordo
+- **WHEN** a Ana sugere quarta 10h, a família responde "quarta só depois das 15h" e a Ana aceita quarta 16h
+- **THEN** o agente confere a agenda dela, confirma quarta 16h e avisa as duas partes
+
+#### Scenario: Nenhuma oferta paralela durante a negociação
+- **WHEN** a Bia, que não foi pedida pela família, está negociando o horário
+- **THEN** nenhuma outra fisio recebe oferta daquele pedido enquanto a negociação estiver aberta
+
+#### Scenario: Negociação durante oferta aberta
+- **WHEN** numa oferta aberta a Carla sugere outro horário antes de qualquer aceite
+- **THEN** as ofertas abertas às demais fisios são suspensas e elas são avisadas de que o horário está em negociação
+
+### Requirement: Fim da negociação sem acordo
+A negociação SHALL terminar sem acordo quando a família ou a fisio desistir, ou quando passar o prazo máximo (padrão 2 horas, ou 3 rodadas sem acordo). Ao terminar sem acordo, o sistema SHALL avisar a fisio e perguntar à família se pode verificar com outra fisio, inclusive quando a família tiver pedido aquela fisio; só com o "sim" da família o sistema SHALL buscar outra.
+
+#### Scenario: Negociação falha com a fisio pedida
+- **WHEN** a família pediu a Ana e não chegaram a um horário comum
+- **THEN** o agente diz à família que não foi possível com a Ana e pergunta se ela aceita ser atendida por outra fisio
+
+#### Scenario: Família aceita outra fisio após a negociação
+- **WHEN** a família responde que pode ser outra fisio
+- **THEN** o sistema roda a alocação sem a fisio da negociação, começando pelo horário escolhido pela família, se ainda estiver livre
+
+#### Scenario: Prazo da negociação esgotado
+- **WHEN** a negociação fica 2 horas sem acordo
+- **THEN** ela é encerrada sem acordo, as duas partes são avisadas e a família é consultada sobre outra fisio
 
 ### Requirement: Aceite automático opcional
 Uma fisioterapeuta SHALL poder ser configurada com aceite automático; nesse caso o sistema MUST confirmar sem esperar resposta e apenas notificá-la do novo agendamento.

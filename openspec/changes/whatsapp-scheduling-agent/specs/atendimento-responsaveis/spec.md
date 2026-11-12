@@ -40,7 +40,7 @@ O agente SHALL oferecer de duas a três opções de horário reais, já verifica
 - **THEN** o agente informa isso e sugere os horários mais próximos fora da janela ou pergunta por outra janela
 
 ### Requirement: Confirmação pendente com a fisioterapeuta
-Quando a alocação exigir aceite da fisioterapeuta, o agente SHALL informar ao responsável que está confirmando com a fisio e SHALL avisá-lo assim que houver aceite, recusa ou estouro de prazo.
+Quando a alocação exigir aceite da fisioterapeuta, o agente SHALL informar ao responsável que está confirmando com a fisio e SHALL avisá-lo assim que houver aceite, recusa, estouro de prazo ou proposta de outro horário pela fisio.
 
 #### Scenario: Aceite recebido
 - **WHEN** a fisio aceita a oferta
@@ -49,6 +49,10 @@ Quando a alocação exigir aceite da fisioterapeuta, o agente SHALL informar ao 
 #### Scenario: Nenhuma fisio aceitou no prazo
 - **WHEN** o prazo de resposta das fisios acaba sem aceite
 - **THEN** o agente avisa o responsável, pede desculpas e oferece outros horários ou atendimento humano
+
+#### Scenario: Fisio propõe outro horário
+- **WHEN** a fisio responde com outro dia ou horário
+- **THEN** o agente apresenta a proposta ao responsável, leva a resposta de volta à fisio e repete até haver acordo ou desistência
 
 ### Requirement: Cancelamento e remarcação pela conversa
 O responsável SHALL poder cancelar ou remarcar um agendamento futuro pelo mesmo chat; o agente SHALL confirmar qual agendamento será alterado antes de executar e SHALL avisar a fisioterapeuta envolvida.

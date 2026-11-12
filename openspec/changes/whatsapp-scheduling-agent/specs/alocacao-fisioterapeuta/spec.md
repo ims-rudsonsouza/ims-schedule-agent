@@ -14,7 +14,7 @@ Uma fisioterapeuta SHALL ser elegível para um horário somente se o intervalo c
 - **THEN** ela não é elegível para 14h
 
 ### Requirement: Preferência da família
-Quando a família indicar uma fisioterapeuta preferida, o sistema SHALL ofertar primeiro os horários dessa fisio, independentemente de distância e carga. Se ela não tiver horário na janela pedida, o sistema SHALL perguntar se a família prefere outro horário com ela ou outra fisio.
+Quando a família indicar uma fisioterapeuta preferida, o sistema SHALL ofertar primeiro os horários dessa fisio, independentemente de distância e carga. Se ela não tiver horário na janela pedida, o sistema SHALL perguntar se a família prefere outro horário com ela ou outra fisio. Outra fisio só SHALL ser considerada com a concordância da família.
 
 #### Scenario: Fisio preferida disponível
 - **WHEN** a família pede "quero com a Ana" e a Ana tem horário na janela
@@ -25,7 +25,7 @@ Quando a família indicar uma fisioterapeuta preferida, o sistema SHALL ofertar 
 - **THEN** o agente oferece os próximos horários da Ana e, como alternativa, horários com outra fisio
 
 ### Requirement: Continuidade do tratamento
-Para criança em tratamento, a fisioterapeuta que já a atende SHALL ser tratada como preferida, salvo se a família pedir outra.
+Para criança em tratamento, a fisioterapeuta que já a atende SHALL ser ofertada primeiro, salvo se a família pedir outra.
 
 #### Scenario: Sessão de continuidade
 - **WHEN** uma criança atendida pela Bia nas últimas sessões pede nova sessão sem citar fisio

@@ -21,11 +21,15 @@ O sistema SHALL coletar somente os dados necessários para agendar e realizar a 
 - **THEN** o agente não armazena o conteúdo no histórico de longo prazo e orienta entregá-lo diretamente à fisio na visita
 
 ### Requirement: Acesso restrito por fisioterapeuta
-Cada fisioterapeuta SHALL ter acesso apenas aos dados dos atendimentos que aceitou; ofertas não aceitas MUST conter somente dados não identificáveis da criança.
+Ofertas SHALL conter apenas o necessário para a fisioterapeuta decidir: nome e idade da criança, endereço e horário, sem diagnóstico nem telefone do responsável. Somente a fisioterapeuta confirmada SHALL receber o telefone do responsável e consultar o atendimento depois; o aviso de privacidade SHALL informar que esses dados são compartilhados com a equipe de fisioterapeutas.
 
 #### Scenario: Fisio que recusou a oferta
 - **WHEN** uma fisio recusou uma oferta
-- **THEN** ela nunca recebe nome nem endereço completo daquela criança
+- **THEN** ela não recebe o telefone do responsável nem atualizações posteriores daquele atendimento
+
+#### Scenario: Aviso de privacidade
+- **WHEN** o responsável lê o aviso antes de consentir
+- **THEN** o aviso informa que nome, idade e endereço da criança são enviados às fisioterapeutas da equipe para oferta do atendimento
 
 ### Requirement: Retenção e exclusão
 O sistema SHALL apagar o histórico de conversa após prazo definido (padrão 90 dias) e SHALL atender pedidos do responsável de acesso, correção e exclusão dos dados, respeitando obrigações legais de guarda.
